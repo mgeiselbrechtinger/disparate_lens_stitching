@@ -13,7 +13,7 @@ if __name__ == '__main__':
         raise FileNotFoundError("Couldn't load image: " + img_name)
 
     # Transform image
-    scale = 1/2 # unitless
+    scale = 1 # unitless but multiples of sqrt(2) are good
     rotation = 0 # degree
     translation = np.array([0, 0]) # pixels
 
@@ -21,13 +21,12 @@ if __name__ == '__main__':
     img_center = [(i-1)/2.0 for i in img_size]
     A = cv2.getRotationMatrix2D(img_center, rotation, scale)
     A[:,2] += translation
-    mod_img = cv2.warpAffine(ref_img, A, img_size)
+    mod_img = cv2.warpAffine(ref_img, A, img_size, borderMode=cv2.BORDER_REPLICATE)
 
     #cv2.imshow('Affine transformation', mod_img)
 
-
     # Get ORB keypoints and descriptors
-    orb = cv2.ORB_create(nfeatures=200)
+    orb = cv2.ORB_create(nfeatures=500)
     ref_kp, ref_des = orb.detectAndCompute(ref_img, None)
     mod_kp, mod_des = orb.detectAndCompute(mod_img, None)
 
@@ -48,6 +47,7 @@ if __name__ == '__main__':
 
     cv2.imshow('matches', matches_img)
 
+    # TODO compute affine tf matrix given matches and compare with original tf
     # Transform ref img kp and check if in vicinity of matched mod img kp
     ref_pts = cv2.KeyPoint.convert(ref_kp)
     mod_pts = cv2.KeyPoint.convert(mod_kp)
