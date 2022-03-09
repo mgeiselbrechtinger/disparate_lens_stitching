@@ -4,6 +4,76 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+def orb_feature_matching(ref_img, mod_img):
+    detector = cv2.ORB_create()
+    # Get keypoints and descriptors
+    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
+    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    # Use hamming distance for binary descriptors
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    # Match descriptors using bruteforce
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
+def brisk_feature_matching(ref_img, mod_img):
+    detector = cv2.BRISK_create()
+    # Get keypoints and descriptors
+    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
+    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    # Use hamming distance for binary descriptors
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    # Match descriptors using bruteforce
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
+def akaze_feature_matching(ref_img, mod_img):
+    detector = cv2.AKAZE_create()
+    # Get keypoints and descriptors
+    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
+    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    # Use hamming distance for binary descriptors
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    # Match descriptors using bruteforce
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
+def sift_feature_matching(ref_img, mod_img):
+    detector = cv2.SIFT_create()
+    # Get keypoints and descriptors
+    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
+    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+    # Match descriptors using bruteforce
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
+def mix_feature_matching(ref_img, mod_img):
+    orb = cv2.ORB_create()
+    ref_kp = orb.detect(ref_img, None)
+    mod_kp = orb.detect(mod_img, None)
+
+    brisk = cv2.BRISK_create()
+    ref_kp, ref_des = brisk.compute(ref_img, ref_kp) 
+    mod_kp, mod_des = brisk.compute(mod_img, mod_kp)    
+
+    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
 if __name__ == '__main__':
     current_path = Path(__file__).parent
     img_num = 0
@@ -13,7 +83,7 @@ if __name__ == '__main__':
         raise FileNotFoundError("Couldn't load image: " + img_name)
 
     # Transform image
-    scale = 1 # unitless but multiples of sqrt(2) are good
+    scale = 2 #1/np.sqrt(2) # unitless but multiples of sqrt(2) are good
     rotation = 0 # degree
     translation = np.array([0, 0]) # pixels
 
@@ -22,21 +92,16 @@ if __name__ == '__main__':
     A = cv2.getRotationMatrix2D(img_center, rotation, scale)
     A[:,2] += translation
     mod_img = cv2.warpAffine(ref_img, A, img_size, borderMode=cv2.BORDER_REPLICATE)
+    #mod_img = mod_img[img_size[0]//4 : 3*img_size[0]//4 + 1, 
+    #                  img_size[1]//4 : 3*img_size[1]//4 + 1]
+    #ref_img = ref_img[1*img_size[1]//8 : 7*img_size[1]//8 + 1, 
+    #                  img_size[0]//2 : ]
+    
+    print(mod_img.shape)
+    
+    #cv2.imshow('Transformation', mod_img)
 
-    #cv2.imshow('Affine transformation', mod_img)
-
-    # Get ORB keypoints and descriptors
-    orb = cv2.ORB_create(nfeatures=500)
-    ref_kp, ref_des = orb.detectAndCompute(ref_img, None)
-    mod_kp, mod_des = orb.detectAndCompute(mod_img, None)
-
-    #kp_img = cv2.drawKeypoints(ref_img, ref_kp, None)
-    #cv2.imshow('window', kp_img)
-
-    # Match descriptors using bruteforce
-    matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    matches = matcher.match(queryDescriptors=ref_des, 
-                            trainDescriptors=mod_des)
+    matches, ref_kp, mod_kp = brisk_feature_matching(ref_img, mod_img)
 
     draw_params = dict(flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS |
                              cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
