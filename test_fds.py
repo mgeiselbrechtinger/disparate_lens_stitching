@@ -83,9 +83,9 @@ if __name__ == '__main__':
         raise FileNotFoundError("Couldn't load image: " + img_name)
 
     # Transform image
-    scale = 2 #1/np.sqrt(2) # unitless but multiples of sqrt(2) are good
-    rotation = 0 # degree
-    translation = np.array([0, 0]) # pixels
+    scale = 1 #1/np.sqrt(2) # unitless but multiples of sqrt(2) are good
+    rotation = 30 # degree
+    translation = np.array([10, -10]) # pixels
 
     img_size = ref_img.shape[1], ref_img.shape[0]
     img_center = [(i-1)/2.0 for i in img_size]
@@ -97,11 +97,21 @@ if __name__ == '__main__':
     #ref_img = ref_img[1*img_size[1]//8 : 7*img_size[1]//8 + 1, 
     #                  img_size[0]//2 : ]
     
+    #A = np.array([[1,0,0],[0,1,0]])
+
+    #mod_img = cv2.pyrDown(ref_img) # 1:2
+    mod_img = cv2.pyrDown(mod_img) # 1:4
+    mod_img = cv2.pyrDown(mod_img) # 1:8
+
+    #mod_img = cv2.pyrUp(mod_img)
+    mod_img = cv2.pyrUp(mod_img)
+    mod_img = cv2.pyrUp(mod_img)
+
     print(mod_img.shape)
     
     #cv2.imshow('Transformation', mod_img)
 
-    matches, ref_kp, mod_kp = brisk_feature_matching(ref_img, mod_img)
+    matches, ref_kp, mod_kp = orb_feature_matching(ref_img, mod_img)
 
     draw_params = dict(flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS |
                              cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
