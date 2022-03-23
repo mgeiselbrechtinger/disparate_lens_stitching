@@ -123,9 +123,10 @@ def sift_feature_matching(ref_img, mod_img):
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
 
-    # RootSIFT version
-    ref_des = np.sqrt(ref_des)
-    mod_des = np.sqrt(mod_des)
+    # RootSIFT version 
+    # TODO maybe skip L1-norm
+    ref_des = np.sqrt(ref_des/np.linalg.norm(ref_des, ord=1, axis=0))
+    mod_des = np.sqrt(mod_des/np.linalg.norm(mod_des, ord=1, axis=0))
 
     matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
     # Match descriptors using bruteforce
