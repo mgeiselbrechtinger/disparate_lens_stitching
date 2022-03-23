@@ -47,13 +47,20 @@ def main():
     cv2.destroyAllWindows()
 
     H, _ = cv2.findHomography(np.array(img1_pts), np.array(img2_pts), 0)
+    print(H)
 
     # TODO refine estimated homography with lukas-kanade algo
+    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+
+    term_criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 500, 1E-8)
+    _, H_r = cv2.findTransformECC(img1_gray, img2_gray, H.astype(np.float32), cv2.MOTION_HOMOGRAPHY, term_criteria)
+
     # TODO store final homography in csv file
     print(H)
 
     img1_size = img1.shape[1], img1.shape[0]
-    img1_warp = cv2.warpPerspective(img1, H, img1_size)
+    img1_warp = cv2.warpPerspective(img1, H_r, img1_size)
     cv2.imshow("img1_warp_win", img1_warp)
     cv2.imshow("img2_win", img2)
 
