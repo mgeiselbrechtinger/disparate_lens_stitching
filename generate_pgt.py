@@ -3,9 +3,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-
-SCREEN_RES = (1920, 1080)
 
 def main():
     # Handle arguments
@@ -51,7 +48,7 @@ def main():
     img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
     img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
-    term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 500, 1E-8)
+    term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 150, 1E-6)
     _, H_r = cv2.findTransformECC(img1_gray, img2_gray, np.array(H, dtype=np.float32), cv2.MOTION_HOMOGRAPHY, term_criteria)
     print(H_r)
     np.savetxt(res_path, H_r, delimiter=',')
