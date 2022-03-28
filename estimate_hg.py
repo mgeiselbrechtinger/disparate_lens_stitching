@@ -4,7 +4,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-ALGO = "sift" # "orb"
+ALGO = "orb" # "orb"
 
 def main():
     # Handle arguments
@@ -19,6 +19,7 @@ def main():
     img1_num = int(sys.argv[1].split('/')[-1][5:8])
     img2_num = int(sys.argv[2].split('/')[-1][5:8])
     ref_path = '/'.join(img1_name.split('/')[:-1]) + f"/homography{img1_num:03d}_{img2_num:03d}.csv"
+    res_path = '/'.join(img1_name.split('/')[:-1]) + f"/{ALGO}{img1_num:03d}_{img2_num:03d}.csv"
 
     # Load files
     img1 = cv2.imread(img1_name, cv2.IMREAD_COLOR)
@@ -31,9 +32,10 @@ def main():
     img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
     # Matching
-    # TODO: choose between SIFT and ORB
-    #matches, ref_kp, mod_kp = orb_feature_matching(ref_img, mod_img)
-    matches, kp1, kp2 = sift_feature_matching(img1_gray, img2_gray)
+    if ALGO == "sift":
+        matches, kp1, kp2 = sift_feature_matching(img1_gray, img2_gray)
+    else:
+        matches, kp1, kp2 = orb_feature_matching(img1_gray, img2_gray)
 
     # TODO implement Lowe ratio test
     img1_pts = list()
@@ -51,6 +53,8 @@ def main():
     print(H_ref)
     norm = np.linalg.norm(H - H_ref)
     print(norm)
+
+    np.savetxt(res_path, H, delimiter=',')
 
 
 def orb_feature_matching(ref_img, mod_img):

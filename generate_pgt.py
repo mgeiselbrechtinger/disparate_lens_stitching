@@ -25,20 +25,7 @@ def main():
         print("Couldn't load images")
         sys.exit(-1)
 
-    # Generate selection window and record manual correspondences
-    cv2.namedWindow("select_win", cv2.WINDOW_NORMAL)        
-    cv2.setWindowProperty("select_win", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    img_comb = np.concatenate((img1, img2), axis=1)
-    img1_pts = list()
-    img2_pts = list()
-    cv2.setMouseCallback('select_win', onMouse, [img_comb, img1_pts, img2_pts, img1.shape[1]])
-    print("Click at list 4 corresponding points in both pictures alternating")
-    while True:
-        cv2.imshow("select_win", img_comb)
-        if cv2.waitKey(20) & 0xFF == ord('q'):
-            break
-
-    cv2.destroyAllWindows()
+    img1_pts, img2_pts = manualCorrespondence(img1, img2)
 
     # Estimate Homography from manual corresponcences
     H, _ = cv2.findHomography(np.array(img1_pts), np.array(img2_pts), 0)
@@ -49,22 +36,38 @@ def main():
     img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
 
     term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 150, 1E-6)
-    _, H_r = cv2.findTransformECC(img1_gray, img2_gray, np.array(H, dtype=np.float32), cv2.MOTION_HOMOGRAPHY, term_criteria)
+    _, H_r = cv2.findTransformECC(img1_gray, img2_gray, 
+                                  np.array(H, dtype=np.float32), 
+                                  cv2.MOTION_HOMOGRAPHY, term_criteria)
     print(H_r)
     np.savetxt(res_path, H_r, delimiter=',')
 
     # Display and store final result
-    # TODO transform corners to get resulting image size
-    #img1_corners = np.array([[0, 0], [img1.shape[1]-1, 0], [0, img1.shape[0]-1], [img1.shape[1]-1, img1.shape[0]-1]], dtype=np.float32)
-    #img1_warp_corners = cv2.perspectiveTransform(img1_corners, np.array(H_r, dtype=np.float32))
-    #img1_warp_size = (int(np.amax(img1_warp_corners[:,0])), int(np.amax(img1_warp_corners[:,1])))
     img1_warp_size = (int(1.5*img1.shape[1]), int(1.5*img1.shape[0]))
-    img1_warp = cv2.warpPerspective(img1, H_r, img1_warp_size)
+    img1_warp = cv2.warpPerspective(img1, H_r, img1_warp_size, flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
     cv2.imshow("img1_warp_win", img1_warp)
     cv2.imshow("img2_win", img2)
 
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def manualCorrespondence(img1, img2):
+    # Generate selection window and record manual correspondences
+    cv2.namedWindow("select_win", cv2.WINDOW_NORMAL)        
+    cv2.setWindowProperty("select_win", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    img_comb = np.concatenate((img1, img2), axis=1)
+    img1_pts = list()
+    img2_pts = list()
+    cv2.setMouseCallback('select_win', onMouse, [img_comb, img1_pts, img2_pts, img1.shape[1]])
+    print("Mark at least 4 corresponding points in both pictures, exit with <q>")
+    while True:
+        cv2.imshow("select_win", img_comb)
+        if cv2.waitKey(20) & 0xFF == ord('q'):
+            break
+
+    cv2.destroyAllWindows()
+    return img1_pts, img2_pts
 
 
 def onMouse(event, x, y, flags, param):
