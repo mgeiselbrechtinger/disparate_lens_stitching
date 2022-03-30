@@ -4,7 +4,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-ALGO = "orb" # "orb"
+ALGO = "orb" # "orb" | "sift"
 
 def main():
     # Handle arguments
@@ -34,8 +34,11 @@ def main():
     # Matching
     if ALGO == "sift":
         matches, kp1, kp2 = sift_feature_matching(img1_gray, img2_gray)
-    else:
+    elif ALGO == "orb":
         matches, kp1, kp2 = orb_feature_matching(img1_gray, img2_gray)
+    else:
+        print("No such algorithm " + ALGO)
+        sys.exit(-1)
 
     # TODO implement Lowe ratio test
     img1_pts = list()
