@@ -7,12 +7,9 @@
 
 import sys
 import argparse
-from pathlib import Path
 
 import cv2
 import numpy as np
-
-REF = "homography" # "homography" | "sift" | "orb" 
 
 def main():
     # Handle arguments
