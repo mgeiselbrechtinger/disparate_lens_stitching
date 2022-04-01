@@ -57,7 +57,7 @@ def main():
         # Apply homography and overlay on frame
         img = cv2.warpPerspective(img, H, (frame.shape[1], frame.shape[0])) 
         mask = (img[:, :, 3] == 255)
-        frame[mask, :] = img[mask, :3]
+        frame[mask, :3] = img[mask, :3]
 
     if args.top:
         alpha = 255*np.ones((base_img.shape[0], base_img.shape[1], 1), dtype=base_img.dtype)
@@ -67,7 +67,7 @@ def main():
                                       borderType=cv2.BORDER_CONSTANT, value=0)
 
         mask = (img[:, :, 3] == 255)
-        frame[mask, :] = img[mask, :3]
+        frame[mask, :3] = img[mask, :3]
 
     cv2.imshow("composition", frame)
     cv2.waitKey(0)
