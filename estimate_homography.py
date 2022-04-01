@@ -5,9 +5,7 @@
 #
 ################################################################################
 
-import sys
 import argparse
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -35,8 +33,7 @@ def main():
     img_src = cv2.imread(args.img_names[0], cv2.IMREAD_COLOR)
     img_dest = cv2.imread(args.img_names[1], cv2.IMREAD_COLOR)
     if img_src is None or img_dest is None:
-        print("Couldn't load images")
-        sys.exit(-1)
+        raise OSError(-1, "Could not open file.", args.img_names[0], args.img_names[1])
 
     img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)

@@ -1,4 +1,12 @@
-import sys
+################################################################################
+#
+#   Construct grount truth homography from src to dest image by refinement
+#       of hand labeled correspondences
+#
+#
+################################################################################
+
+import argparse
 from pathlib import Path
 
 import cv2
@@ -6,50 +14,42 @@ import numpy as np
 
 def main():
     # Handle arguments
-    if len(sys.argv) != 3:
-        print(f"USAGE: ./{sys.argv[0]} path/to/image[n1].jpg path/to/image[n2].jpg\n\tComputes homography between image[n1].jpg and image[n2].jpg\n\t,stores it in same directory as homography[n1]_[n2].csv") 
-        sys.exit(-1)
-
-    current_path = Path(__file__).parent
-
-    img1_name = f"{current_path}/{sys.argv[1]}"
-    img2_name = f"{current_path}/{sys.argv[2]}"
-    img1_num = int(sys.argv[1].split('/')[-1][5:8])
-    img2_num = int(sys.argv[2].split('/')[-1][5:8])
-    res_path = '/'.join(img1_name.split('/')[:-1]) + f"/homography{img1_num:03d}_{img2_num:03d}.csv"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('img_names', nargs=2, help="Paths to src- and dest-image)")
+    parser.add_argument('-o', '--outfile', dest='hg_name', help="Path for homography csv-file")
+    parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
+    args = parser.parse_args()
 
     # Load files
-    img1 = cv2.imread(img1_name, cv2.IMREAD_COLOR)
-    img2 = cv2.imread(img2_name, cv2.IMREAD_COLOR)
-    if img1 is None or img2 is None:
-        print("Couldn't load images")
-        sys.exit(-1)
+    img_src = cv2.imread(args.img_names[0], cv2.IMREAD_COLOR)
+    img_dest = cv2.imread(args.img_names[1], cv2.IMREAD_COLOR)
+    if img_src is None or img_dest is None:
+        raise OSError(-1, "Could not open file.", args.img_names[0], args.img_names[1])
 
-    img1_pts, img2_pts = manualCorrespondence(img1, img2)
+    img_src_pts, img_dest_pts = manualCorrespondence(img_src, img_dest)
+    if len(img_src_pts) != len(img_dest_pts) or len(img_src_pts) < 4:
+        raise Exception("Invalid correspondences")
 
-    # Estimate Homography from manual corresponcences
-    H, _ = cv2.findHomography(np.array(img1_pts), np.array(img2_pts), 0)
-    print(H)
+    # Estimate Homography from manual corresponcences using LS
+    H, _ = cv2.findHomography(np.array(img_src_pts), np.array(img_dest_pts), 0)
+    if args.verbose:
+        print("Homography estimated from hand picked correspondences")
+        print(H)
 
     # Refinde Homography by ECC minimization
-    img1_gray = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
-    img2_gray = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+    img_src_gray = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
+    img_dest_gray = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
 
     term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 150, 1E-6)
-    _, H_r = cv2.findTransformECC(img1_gray, img2_gray, 
+    _, H_r = cv2.findTransformECC(img_src_gray, img_dest_gray, 
                                   np.array(H, dtype=np.float32), 
                                   cv2.MOTION_HOMOGRAPHY, term_criteria)
-    print(H_r)
-    np.savetxt(res_path, H_r, delimiter=',')
+    if args.verbose:
+        print("Final pseudo ground truth homography")
+        print(H_r)
 
-    # Display and store final result
-    img1_warp_size = (int(1.5*img1.shape[1]), int(1.5*img1.shape[0]))
-    img1_warp = cv2.warpPerspective(img1, H_r, img1_warp_size, flags=cv2.INTER_LINEAR | cv2.WARP_INVERSE_MAP)
-    cv2.imshow("img1_warp_win", img1_warp)
-    cv2.imshow("img2_win", img2)
-
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    if args.hg_name != None:
+        np.savetxt(args.hg_name, H_r, delimiter=',')
 
 
 def manualCorrespondence(img1, img2):
