@@ -10,21 +10,22 @@ import argparse
 import cv2
 import numpy as np
 
-SCREEN_SIZE = [1920, 1080]
+OUTPUT_SIZE = [1024, 640]
 
 def main():
     # Handle arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('base_img_name', help="Path to base image")
-    parser.add_argument('img_names', nargs='+', help="Paths to stitch images")
-    parser.add_argument('hg_names', nargs='+', help="Paths to homography csv-files")
+    parser.add_argument('img_hg_pairs', nargs='+', help="Paths to images and homographies pairs")
     parser.add_argument('-t', '--top', action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
 
-    if len(args.img_names) != len(args.hg_names):
+    if len(args.img_hg_pairs) % 2 != 0:
         raise AttributeError("Image or homography file missing")
 
-    # Load bas image
+    args.hg_names = args.img_hg_pairs[1::2]
+    args.img_names = args.img_hg_pairs[::2]
+    # Load base image
     base_img = cv2.imread(args.base_img_name, cv2.IMREAD_UNCHANGED)
     if base_img is None:
         raise OSError(-1, "Could not open file.", args.base_img_name)
@@ -57,50 +58,42 @@ def main():
         rois = np.concatenate([rois, roi_warped], axis=0)
 
     # Calculate ROI bound union 
-    lower_bound = np.amin(rois, axis=0)[0].astype(np.int32) - 1
-    upper_bound = np.amax(rois, axis=0)[0].astype(np.int32) + 1
-    frame_offset_x, frame_offset_y = np.abs(lower_bound).tolist()
-    A = np.float32([[1, 0, frame_offset_x], [0, 1, frame_offset_y]])
+    lower_bound = np.amin(rois, axis=0)[0].astype(np.int32)
+    upper_bound = np.amax(rois, axis=0)[0].astype(np.int32) - np.array(base_img.shape)[[1,0]] 
+    frame_offset = np.abs(lower_bound).tolist()
+    # Translation to frame coordinates as Affine transform
+    A = np.float32([[1, 0, frame_offset[0]], [0, 1, frame_offset[1]], [0, 0, 1]])
 
     # Create common frame from base image
-    frame = cv2.copyMakeBorder(base_img, frame_offset_y, upper_bound[1], 
-                                         frame_offset_x, upper_bound[0], 
+    frame = cv2.copyMakeBorder(base_img, frame_offset[1], upper_bound[1], 
+                                         frame_offset[0], upper_bound[0], 
                                          borderType=cv2.BORDER_CONSTANT, value=0)
-
 
     # Align images on frame
     for img, H in zip(imgs, hgs):
-        # Add alpha channel with all ones and enlarge image to frame size
+        # Add alpha channel for overlay region
         alpha = 255*np.ones((img.shape[0], img.shape[1], 1), dtype=img.dtype)
         img = np.concatenate([img, alpha], axis=2)
-        #img = cv2.copyMakeBorder(img, frame_offset_y, frame_offset_y, 
-        #                              frame_offset_x, frame_offset_x, 
-        #                              borderType=cv2.BORDER_CONSTANT, value=0)
-
     
-        # Apply homography and overlay on frame
+        # Apply homography and translation to frame
+        H = A.dot(H)
         img = cv2.warpPerspective(img, H, (frame.shape[1], frame.shape[0])) 
-        img = cv2.warpAffine(img, A, (frame.shape[1], frame.shape[0])) 
+        # Overlay region given by warped alpha channel
         mask = (img[:, :, 3] == 255)
         frame[mask, :3] = img[mask, :3]
 
+    # Put base image on top
     if args.top:
-        alpha = 255*np.ones((base_img.shape[0], base_img.shape[1], 1), dtype=base_img.dtype)
-        img = np.concatenate([base_img, alpha], axis=2)
-        img = cv2.copyMakeBorder(img, frame_offset_y, upper_bound[1], 
-                                      frame_offset_x, upper_bound[0], 
-                                      borderType=cv2.BORDER_CONSTANT, value=0)
-
-        mask = (img[:, :, 3] == 255)
-        frame[mask, :3] = img[mask, :3]
+        frame[frame_offset[1] : frame_offset[1] + base_img.shape[0], 
+              frame_offset[0] : frame_offset[0] + base_img.shape[1]] = base_img
 
     # Output frame
-    frame_size = np.int32(SCREEN_SIZE)
+    frame_size = np.int32(OUTPUT_SIZE)
     if base_aspect > 1: 
-        frame_size[1] = int(frame_size[1]*base_aspect)
+        frame_size[1] = int(frame_size[0]/base_aspect)
 
     else:
-        frame_size[0] = int(frame_size[0]/base_aspect)
+        frame_size[0] = int(frame_size[1]*base_aspect)
 
     frame = cv2.resize(frame, tuple(frame_size))
     cv2.imshow("composition", frame)
