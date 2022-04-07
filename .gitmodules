@@ -1,0 +1,6 @@
+[submodule "L2-Net-Python-Keras"]
+	path = L2-Net-Python-Keras
+	url = git@github.com:virtualgraham/L2-Net-Python-Keras.git
+[submodule "hardnet"]
+	path = hardnet
+	url = git@github.com:DagnyT/hardnet.git

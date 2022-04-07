@@ -10,7 +10,9 @@
 
 import cv2
 import numpy as np
-
+import onnx
+import onnxruntime
+from extract_patches.core import extract_patches
 
 def orb_detect_and_match(ref_img, mod_img):
     detector = cv2.ORB_create()
@@ -88,3 +90,65 @@ def mix_feature_matching(ref_img, mod_img):
 
     return matches, ref_kp, mod_kp
 
+def l2net_detect_and_match(ref_img, mod_img):
+    # Get DoG keypoints using SIFT
+    detector = cv2.SIFT_create()
+    ref_kp = detector.detect(ref_img, None)
+    mod_kp = detector.detect(mod_img, None)
+
+    mrSize = 6.0
+    patch_size = 32
+    ref_ps = extract_patches(ref_kp, ref_img, patch_size, mrSize, 'cv2')
+    mod_ps = extract_patches(mod_kp, mod_img, patch_size, mrSize, 'cv2')
+
+    # TODO get onnx version of L2Net 
+    # Load model 
+    onnx_model = onnx.load("onnx_models/L2Net.onnx")
+    onnx.checker.check_model(onnx_model)
+    onnx_sess = onnxruntime.InferenceSession("onnx_models/L2Net.onnx")
+    onnx_input_name = onnx_sess.get_inputs()[0].name
+
+    # Format input and perform inference
+    ref_ps = np.array(ref_ps, dtype=np.float32)/255
+    ref_ps = ref_ps.reshape(-1, 1, patch_size, patch_size)
+    ref_des = onnx_sess.run(None, {onnx_input_name : ref_ps})[0]
+    mod_ps = np.array(mod_ps, dtype=np.float32)/255
+    mod_ps = mod_ps.reshape(-1, 1, patch_size, patch_size)
+    mod_des = onnx_sess.run(None, {onnx_input_name : mod_ps})[0]
+
+    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp
+
+def hardnet_detect_and_match(ref_img, mod_img):
+    # Get DoG keypoints using SIFT
+    detector = cv2.SIFT_create()
+    ref_kp = detector.detect(ref_img, None)
+    mod_kp = detector.detect(mod_img, None)
+
+    mrSize = 6.0
+    patch_size = 32
+    ref_ps = extract_patches(ref_kp, ref_img, patch_size, mrSize, 'cv2')
+    mod_ps = extract_patches(mod_kp, mod_img, patch_size, mrSize, 'cv2')
+
+    # Load model 
+    onnx_model = onnx.load("onnx_models/HardNet.onnx")
+    onnx.checker.check_model(onnx_model)
+    onnx_sess = onnxruntime.InferenceSession("onnx_models/HardNet.onnx")
+    onnx_input_name = onnx_sess.get_inputs()[0].name
+
+    # Format input and perform inference
+    ref_ps = np.array(ref_ps, dtype=np.float32)/255
+    ref_ps = ref_ps.reshape(-1, 1, patch_size, patch_size)
+    ref_des = onnx_sess.run(None, {onnx_input_name : ref_ps})[0]
+    mod_ps = np.array(mod_ps, dtype=np.float32)/255
+    mod_ps = mod_ps.reshape(-1, 1, patch_size, patch_size)
+    mod_des = onnx_sess.run(None, {onnx_input_name : mod_ps})[0]
+
+    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+    matches = matcher.match(queryDescriptors=ref_des, 
+                            trainDescriptors=mod_des)
+
+    return matches, ref_kp, mod_kp

@@ -7,3 +7,6 @@ dependencies:
   - matplotlib=3.5
   - opencv=4.5
   - pip=20.3
+  - pytorch
+  - onnxruntime
+  - tf2onnx

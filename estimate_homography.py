@@ -16,7 +16,9 @@ import feature_matchers as fm
 func_dict = { 'sift'    : fm.sift_detect_and_match, 
               'orb'     : fm.orb_detect_and_match,
               'akaze'   : fm.akaze_detect_and_match,
-              'brisk'   : fm.brisk_detect_and_match }
+              'brisk'   : fm.brisk_detect_and_match,
+              'l2net'   : fm.l2net_detect_and_match,
+              'hardnet' : fm.hardnet_detect_and_match }
 
 
 def main():
@@ -24,7 +26,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('img_names', nargs=2, help="Paths to src- and dest-image)")
     parser.add_argument('-o', '--outfile', dest='hg_name', help="Path for homography csv-file")
-    parser.add_argument('-d', '--detector', choices=func_dict, help="Determine which feature detector to use")
+    parser.add_argument('-d', '--detector', choices=func_dict.keys(), help="Determine which feature detector to use")
     parser.add_argument('-e', '--evaluate', dest='gt_name', help="Path to ground truth homography csv-file")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
