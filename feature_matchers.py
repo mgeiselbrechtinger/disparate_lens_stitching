@@ -14,6 +14,7 @@ import onnx
 import onnxruntime
 from extract_patches.core import extract_patches
 
+
 def orb_detect_and_match(ref_img, mod_img):
     detector = cv2.ORB_create()
     # get keypoints and descriptors
@@ -63,16 +64,29 @@ def sift_detect_and_match(ref_img, mod_img):
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
 
     # RootSIFT version 
-    # TODO make available as option
     #ref_des = np.sqrt(ref_des/np.linalg.norm(ref_des, ord=1, axis=0))
     #mod_des = np.sqrt(mod_des/np.linalg.norm(mod_des, ord=1, axis=0))
 
-    matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-    # Match descriptors using bruteforce
-    matches = matcher.match(queryDescriptors=ref_des, 
-                            trainDescriptors=mod_des)
+    # Match descriptors using bruteforce 
+    lrt = False
+    good_matches = list()
+    if(lrt):
+        matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
+        matches = matcher.knnMatch(queryDescriptors=ref_des, 
+                                   trainDescriptors=mod_des,
+                                   k=2)
+        
+        for m, n in matches:
+            if m.distance < 0.7*n.distance:
+                good_matches.append(m)
 
-    return matches, ref_kp, mod_kp
+    else:
+        matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+        matches = matcher.match(queryDescriptors=ref_des, 
+                                   trainDescriptors=mod_des)
+        good_matches = matches
+
+    return good_matches, ref_kp, mod_kp
 
 def mix_feature_matching(ref_img, mod_img):
     # TODO allow different combinations
@@ -134,9 +148,9 @@ def hardnet_detect_and_match(ref_img, mod_img):
     mod_ps = extract_patches(mod_kp, mod_img, patch_size, mrSize, 'cv2')
 
     # Load model 
-    onnx_model = onnx.load("onnx_models/HardNet.onnx")
+    onnx_model = onnx.load("onnx_models/HardNet++.onnx")
     onnx.checker.check_model(onnx_model)
-    onnx_sess = onnxruntime.InferenceSession("onnx_models/HardNet.onnx")
+    onnx_sess = onnxruntime.InferenceSession("onnx_models/HardNet++.onnx")
     onnx_input_name = onnx_sess.get_inputs()[0].name
 
     # Format input and perform inference
