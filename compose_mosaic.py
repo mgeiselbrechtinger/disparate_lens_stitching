@@ -17,12 +17,6 @@ def compose(base_img, imgs, hgs, base_on_top=False):
     base_rois = np.float32([[0, 0], [base_img.shape[1], base_img.shape[0]]])
     rois = base_rois.reshape(-1, 1, 2)
     for img, H in zip(imgs, hgs):
-        #scale = 1, 1 # s_x, s_y
-        #H[0, 2] *= scale[0]
-        #H[1, 2] *= scale[1]
-        #H[2, 0] /= scale[0]
-        #H[2, 1] /= scale[1]
-
         roi = np.float32([[0, 0], [img.shape[1], 0], [img.shape[1], img.shape[0]], [0, img.shape[0]]]) 
         roi_warped = cv2.perspectiveTransform(roi.reshape(-1, 1, 2), H)
 

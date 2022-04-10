@@ -16,7 +16,7 @@ from extract_patches.core import extract_patches
 
 
 def orb_detect_and_match(ref_img, mod_img):
-    detector = cv2.ORB_create()
+    detector = cv2.ORB_create(nfeatures=5000) # Default of 500 features way too less
     # get keypoints and descriptors
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
