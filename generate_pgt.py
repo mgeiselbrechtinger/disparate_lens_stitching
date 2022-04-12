@@ -8,9 +8,12 @@
 
 import argparse
 from pathlib import Path
+import time
 
 import cv2
 import numpy as np
+
+from compose_mosaic import compose
 
 def main():
     # Handle arguments
@@ -36,17 +39,44 @@ def main():
         print("Homography estimated from hand picked correspondences")
         print(H)
 
+        res_hl = compose(img_dest, [img_src], [H])
+
     # Refinde Homography by ECC minimization
     img_src_gray = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_gray = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
 
-    term_criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_MAX_ITER, 150, 1E-6)
-    _, H_r = cv2.findTransformECC(img_src_gray, img_dest_gray, 
-                                  np.array(H, dtype=np.float32), 
+    img_src_gray_h = cv2.pyrDown(img_src_gray)
+    img_dest_gray_h = cv2.pyrDown(img_dest_gray)
+
+    scale = 0.5
+    H_r = H
+    H_r[0, 2] *= scale 
+    H_r[1, 2] *= scale 
+    H_r[2, 0] /= scale 
+    H_r[2, 1] /= scale 
+
+    start_ecc = time.time()
+
+    term_criteria = (cv2.TERM_CRITERIA_EPS, None, 1E-7)
+    _, H_r = cv2.findTransformECC(img_src_gray_h, img_dest_gray_h, 
+                                  np.array(H_r, dtype=np.float32), 
                                   cv2.MOTION_HOMOGRAPHY, term_criteria)
+    ecc_duration = time.time() - start_ecc
+
+    H_r[0, 2] /= scale 
+    H_r[1, 2] /= scale 
+    H_r[2, 0] *= scale 
+    H_r[2, 1] *= scale 
+    
     if args.verbose:
-        print("Final pseudo ground truth homography")
+        print(f"Refined pseudo ground truth homography in {ecc_duration:03f}s")
         print(H_r)
+
+        res_ref = compose(img_dest, [img_src], [H_r])
+        cv2.imshow("hand-labeled corespondence", res_hl)
+        cv2.imshow("refined corespondence", res_ref)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     if args.hg_name != None:
         np.savetxt(args.hg_name, H_r, delimiter=',')
@@ -86,7 +116,7 @@ def onMouse(event, x, y, flags, param):
             cv2.circle(img, (x, y), 4, color=min(255, 30*len(pts2)), thickness=1)
             pts2.append((x-img1_width, y))
 
-    elif event == cv2.EVENT_MBUTTONDOWN:
+    elif False and event == cv2.EVENT_MBUTTONDOWN:
         pt = tuple()
         if x < img1_width:
             pt = pts1.pop()

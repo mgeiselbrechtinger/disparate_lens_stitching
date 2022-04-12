@@ -83,6 +83,9 @@ def main():
                                         cv2.USAC_DEFAULT, 7.0)
     hduration = time.time() - hstart
 
+    if H is None:
+        raise ValueError("Homography estimation failed")
+
     # Up sale homography to fit original images 
     H[0, 2] /= args.scale 
     H[1, 2] /= args.scale 
@@ -91,9 +94,6 @@ def main():
 
     img_src = img_src_b
     img_dest = img_dest_b
-
-    if H is None:
-        raise ValueError("Homography estimation failed")
 
     if args.verbose:
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")

@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 
 OUTPUT_SIZE = [1024, 640]
+DEBUG_ROIS = True
 
 def compose(base_img, imgs, hgs, base_on_top=False):
     # Calculate ROIs
@@ -38,19 +39,27 @@ def compose(base_img, imgs, hgs, base_on_top=False):
     for img, H in zip(imgs, hgs):
         # Add alpha channel for overlay region
         alpha = 255*np.ones((img.shape[0], img.shape[1], 1), dtype=img.dtype)
-        img = np.concatenate([img, alpha], axis=2)
+        img_warp = np.concatenate([img, alpha], axis=2)
     
         # Apply homography and translation to frame
-        H = A.dot(H)
-        img = cv2.warpPerspective(img, H, (frame.shape[1], frame.shape[0])) 
+        AH = A.dot(H)
+        img_warp = cv2.warpPerspective(img_warp, AH, (frame.shape[1], frame.shape[0])) 
         # Overlay region given by warped alpha channel
-        mask = (img[:, :, 3] == 255)
-        frame[mask, :3] = img[mask, :3]
+        mask = (img_warp[:, :, 3] == 255)
+        frame[mask, :3] = img_warp[mask, :3]
 
     # Put base image on top
     if base_on_top:
         frame[frame_offset[1] : frame_offset[1] + base_img.shape[0], 
               frame_offset[0] : frame_offset[0] + base_img.shape[1]] = base_img
+
+    if DEBUG_ROIS:
+        for img, H in zip(imgs, hgs):
+            AH = A.dot(H)
+            roi = np.float32([[0, 0], [img.shape[1], 0], 
+                    [img.shape[1], img.shape[0]], [0, img.shape[0]]])
+            roi_warped = cv2.perspectiveTransform(roi.reshape(-1, 1, 2), AH)
+            frame = cv2.polylines(frame, [roi_warped.astype(np.int32)], True, [0, 0, 255])
 
     # Output frame
     frame_size = np.int32(OUTPUT_SIZE)
