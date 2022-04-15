@@ -9,11 +9,12 @@ import argparse
 
 import cv2
 import numpy as np
+from math import log
 
 OUTPUT_SIZE = [1024, 640]
 DEBUG_ROIS = True
 
-def compose(base_img, imgs, hgs, base_on_top=False):
+def compose(base_img, imgs, hgs, base_on_top=True):
     # Calculate ROIs
     base_rois = np.float32([[0, 0], [base_img.shape[1], base_img.shape[0]]])
     rois = base_rois.reshape(-1, 1, 2)
@@ -22,6 +23,9 @@ def compose(base_img, imgs, hgs, base_on_top=False):
         roi_warped = cv2.perspectiveTransform(roi.reshape(-1, 1, 2), H)
 
         rois = np.concatenate([rois, roi_warped], axis=0)
+
+    if DEBUG_ROIS:
+        print(rois)
 
     # Calculate ROI bound union 
     lower_bound = np.amin(rois, axis=0)[0].astype(np.int32)
@@ -70,7 +74,7 @@ def compose(base_img, imgs, hgs, base_on_top=False):
     else:
         frame_size[0] = int(frame_size[1]*base_aspect)
 
-    frame = cv2.resize(frame, tuple(frame_size))
+    #frame = cv2.resize(frame, tuple(frame_size))
     return frame
 
 
@@ -80,6 +84,7 @@ if __name__=="__main__":
     parser.add_argument('base_img_name', help="Path to base image")
     parser.add_argument('img_hg_pairs', nargs='+', help="Paths to images and homographies pairs")
     parser.add_argument('-t', '--top', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('-s', '--scale', type=int, choices=[1, 2, 4, 8], default=1)
     args = parser.parse_args()
 
     if len(args.img_hg_pairs) % 2 != 0:
@@ -92,6 +97,9 @@ if __name__=="__main__":
     if base_img is None:
         raise OSError(-1, "Could not open file.", args.base_img_name)
 
+    for i in range(int(log(args.scale, 2))):
+        base_img = cv2.pyrDown(base_img)
+
     # Load images and homographies
     imgs = list()
     hgs = list()
@@ -103,15 +111,24 @@ if __name__=="__main__":
             print("Couldn't load image")
             sys.exit(-1)
 
+        for i in range(int(log(args.scale, 2))):
+            img = cv2.pyrDown(img)
+            
         H = np.loadtxt(hg_name, delimiter=',')
         if H.shape != (3, 3):
             raise Exception("Homography of wrong format {H.shape} but expected (3, 3)")
+
+        H[0, 2] /= args.scale 
+        H[1, 2] /= args.scale 
+        H[2, 0] *= args.scale 
+        H[2, 1] *= args.scale 
 
         imgs.append(img)
         hgs.append(H)
         
     mosaic = compose(base_img, imgs, hgs, base_on_top=args.top)
 
+    cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
     cv2.imshow("composition", mosaic)
     cv2.waitKey(0)
     cv2.destroyAllWindows()

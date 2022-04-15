@@ -16,6 +16,7 @@ from extract_patches.core import extract_patches
 
 
 def orb_detect_and_match(ref_img, mod_img):
+    #detector = cv2.ORB_create(nfeatures=10000, scaleFactor=2, nlevels=8) 
     detector = cv2.ORB_create(nfeatures=5000) # Default of 500 features way too less
     # get keypoints and descriptors
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
@@ -62,6 +63,34 @@ def sift_detect_and_match(ref_img, mod_img):
     # Get keypoints and descriptors
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    if False:
+        # DoG Pyramid info from image
+        # nOctaves = round( ld(min(base_cols, base_rows)) - 2) - firstOctave
+        # base img cols and rows doubled bc firstOctave = -1
+        from math import log
+        firstOctave = -1
+        nOctaves = round(log(2*min(ref_img.shape), 2) - 2) - firstOctave
+        print(f"first=-1, nOctaves={nOctaves}, per formula")
+
+        # DoG Pyramid info from keypoints (taken from opencv SIFT implementation)
+        firstOctave = 0
+        lastOctave = -10000
+        actualNLayers = 0
+        for kpt in ref_kp:
+            octave = kpt.octave & 255
+            layer = (kpt.octave >> 8) & 255
+            octave = octave if octave < 128 else (-128 | octave)
+            scale = 1/(1 << octave) if octave >= 0 else (1 << -octave)
+            firstOctave = min(firstOctave, octave)
+            lastOctave = max(lastOctave, octave)
+            actualNLayers = max(actualNLayers, layer-2)
+            
+        firstOctave = min(firstOctave, 0)
+        nOctaveLayers = 3
+        assert( firstOctave >= -1 and actualNLayers <= nOctaveLayers )
+        actualNOctaves = lastOctave - firstOctave + 1
+        print(f"first={firstOctave}, last={lastOctave}, nOctaves={actualNOctaves}, nLayers={actualNLayers}")
 
     # RootSIFT version 
     #ref_des = np.sqrt(ref_des/np.linalg.norm(ref_des, ord=1, axis=0))

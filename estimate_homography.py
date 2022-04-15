@@ -10,6 +10,7 @@ import argparse
 import cv2
 import numpy as np
 
+from compose_mosaic import compose
 import feature_matchers as fm
 
 func_dict = { 'sift'    : fm.sift_detect_and_match, 
@@ -69,18 +70,24 @@ def main():
 
     pts_src = list()
     pts_dest = list()
-    #matches = sorted(matches, key=lambda m: m.distance) # Sorting required for PROSAC 
+    matches = sorted(matches, key=lambda m: m.distance) # Sorting required for PROSAC 
     for m in matches:
         pts_src.append(kp_src[m.queryIdx].pt)
         pts_dest.append(kp_dest[m.trainIdx].pt)
 
     H, inlier_mask = cv2.findHomography(np.array(pts_src, dtype=np.float32), 
                                         np.array(pts_dest, dtype=np.float32), 
-                                        cv2.RANSAC, 7.0)
+                                        cv2.USAC_PROSAC, 7.0)
 
     if args.verbose or args.gt_name != None:
         print(f"Estimated homography with {args.detector.upper()}")
         print(H)
+
+        res = compose(img_dest, [img_src], [H])
+        cv2.namedWindow("stitched image", cv2.WINDOW_NORMAL)        
+        cv2.imshow("stitched image", res)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
     if args.hg_name != None:
         np.savetxt(args.hg_name, H, delimiter=',')
