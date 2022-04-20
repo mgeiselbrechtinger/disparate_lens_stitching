@@ -15,14 +15,14 @@ import cv2
 import numpy as np
 
 # Modes: 
-#   (0) Distribute distortion (90degree) to upper and lower points
+#   (0) Squash and strech lower and upper points respectively (90degree, information loss)
 #   (1) Same as (0) but only half way (45degree)
 #   (2) Stretch upper points (90degree, no information loss)
 #   (3) Same as (2) but only half way (45degree)
 #   (4) Squash lower points (90degree, max information loss)
 #   (5) Same as (4) but only half way (45degree)
 mode_offsets = [lambda uw, lw: (-(lw - uw)/4, (lw - uw)/4, -(lw - uw)/4, (lw - uw)/4),
-                lambda uw, lw: (-uw/2 - (lw-uw)/8, uw/2 + (lw-uw)/8, -lw/2 - (lw-uw)/8, lw/2 + (lw-uw)/8),
+                lambda uw, lw: (-uw/2 - (lw-uw)/8, uw/2 + (lw-uw)/8, -lw/2 + (lw-uw)/8, lw/2 - (lw-uw)/8),
                 lambda uw, lw: (-lw/2, lw/2, -lw/2, lw/2),
                 lambda uw, lw: (-lw/4, lw/4, -lw/2, lw/2),
                 lambda uw, lw: (-uw/2, uw/2, -uw/2, uw/2),
@@ -67,6 +67,7 @@ def main():
         dest_lr = np.float32([w/2 + offset[3], h])
         dest_pts = np.stack([dest_ul, dest_ur, dest_ll, dest_lr], axis=0)
 
+        print(dest_pts)
         H = cv2.getPerspectiveTransform(src_pts, dest_pts)
 
         img_bev = cv2.warpPerspective(img, H, (w, h), flags=cv2.INTER_CUBIC)
@@ -74,7 +75,8 @@ def main():
         if args.verbose:
             print(H)
             cv2.namedWindow("bird eye transform", cv2.WINDOW_NORMAL)        
-            cv2.imshow('bird eye transform', img_bev)
+            img_viz = np.concatenate([img, img_bev], axis=1)
+            cv2.imshow('bird eye transform', img_viz)
             cv2.waitKey(0)
 
         if args.write:
