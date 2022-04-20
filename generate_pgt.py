@@ -46,7 +46,7 @@ def main():
     img_src_gray_h = cv2.pyrDown(img_src_gray)
     img_dest_gray_h = cv2.pyrDown(img_dest_gray)
 
-    scale = 1.0
+    scale = 0.5
     H_r = H
     H_r[0, 2] *= scale 
     H_r[1, 2] *= scale 
@@ -55,7 +55,7 @@ def main():
 
     start_ecc = time.time()
 
-    term_criteria = (cv2.TERM_CRITERIA_EPS, None, 1E-7)
+    term_criteria = (cv2.TERM_CRITERIA_EPS, None, 1E-6)
     _, H_r = cv2.findTransformECC(img_src_gray_h, img_dest_gray_h, 
                                   np.array(H_r, dtype=np.float32), 
                                   cv2.MOTION_HOMOGRAPHY, term_criteria)

@@ -13,6 +13,7 @@ from math import log
 
 OUTPUT_SIZE = [1024, 640]
 DEBUG_ROIS = True
+DEBUG_BOUNDS = True
 
 def compose(base_img, imgs, hgs, base_on_top=True):
     # Calculate ROIs
@@ -24,19 +25,21 @@ def compose(base_img, imgs, hgs, base_on_top=True):
 
         rois = np.concatenate([rois, roi_warped], axis=0)
 
-    if DEBUG_ROIS:
-        print(rois)
+    # TODO Add bounding rois check bound computation
+    if DEBUG_BOUNDS:
+        rois = np.float32([[-1000, -1000], [6000, 6000]]).reshape(-1,1,2)
 
     # Calculate ROI bound union 
     lower_bound = np.amin(rois, axis=0)[0].astype(np.int32)
-    upper_bound = np.amax(rois, axis=0)[0].astype(np.int32) - np.array(base_img.shape)[[1,0]] 
-    frame_offset = np.abs(lower_bound).tolist()
+    upper_bound = np.amax(rois, axis=0)[0].astype(np.int32) 
+    lower_offset = np.abs(lower_bound)
+    upper_offset = upper_bound - np.array(base_img.shape)[[1,0]] 
     # Translation to frame coordinates as Affine transform
-    A = np.float32([[1, 0, frame_offset[0]], [0, 1, frame_offset[1]], [0, 0, 1]])
+    A = np.float32([[1, 0, lower_offset[0]], [0, 1, lower_offset[1]], [0, 0, 1]])
 
     # Create common frame from base image
-    frame = cv2.copyMakeBorder(base_img, frame_offset[1], upper_bound[1], 
-                                         frame_offset[0], upper_bound[0], 
+    frame = cv2.copyMakeBorder(base_img, lower_offset[1], upper_offset[1], 
+                                         lower_offset[0], upper_offset[0], 
                                          borderType=cv2.BORDER_CONSTANT, value=0)
 
     # Align images on frame
@@ -54,8 +57,8 @@ def compose(base_img, imgs, hgs, base_on_top=True):
 
     # Put base image on top
     if base_on_top:
-        frame[frame_offset[1] : frame_offset[1] + base_img.shape[0], 
-              frame_offset[0] : frame_offset[0] + base_img.shape[1]] = base_img
+        frame[lower_offset[1] : lower_offset[1] + base_img.shape[0], 
+              lower_offset[0] : lower_offset[0] + base_img.shape[1]] = base_img
 
     if DEBUG_ROIS:
         for img, H in zip(imgs, hgs):
@@ -84,7 +87,7 @@ if __name__=="__main__":
     parser.add_argument('base_img_name', help="Path to base image")
     parser.add_argument('img_hg_pairs', nargs='+', help="Paths to images and homographies pairs")
     parser.add_argument('-t', '--top', action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument('-s', '--scale', type=int, choices=[1, 2, 4, 8], default=1)
+    parser.add_argument('-s', '--scale', type=int, choices=[1, 2, 4, 8, 16, 32], default=1)
     args = parser.parse_args()
 
     if len(args.img_hg_pairs) % 2 != 0:
