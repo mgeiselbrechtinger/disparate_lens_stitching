@@ -12,8 +12,8 @@ import numpy as np
 from math import log
 
 OUTPUT_SIZE = [1024, 640]
-DEBUG_ROIS = True
-DEBUG_BOUNDS = True
+DEBUG_ROIS = False
+DEBUG_BOUNDS = False
 
 def compose(base_img, imgs, hgs, base_on_top=True):
     # Calculate ROIs

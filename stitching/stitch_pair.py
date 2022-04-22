@@ -101,6 +101,7 @@ def main():
 
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
+    cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
     cv2.imshow("composition", res)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
@@ -109,6 +110,9 @@ def main():
         cv2.imwrite(args.outfile, res)
 
     print(f"Done in {mduration+hduration:03f}s")
+
+    if args.verbose:
+        print(f"Scale change h, w: {res.shape[0]/img_src.shape[0], res.shape[1]/img_src.shape[1]}")
 
 if __name__ == '__main__':
     main()
