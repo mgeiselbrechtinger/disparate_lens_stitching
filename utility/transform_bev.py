@@ -21,12 +21,14 @@ import numpy as np
 #   (3) Same as (2) but only half way (45degree)
 #   (4) Squash lower points (90degree, max information loss)
 #   (5) Same as (4) but only half way (45degree)
+#   (6) Same as (0) but only quarter way (25degree)
 mode_offsets = [lambda uw, lw: (-(lw - uw)/4, (lw - uw)/4, -(lw - uw)/4, (lw - uw)/4),
                 lambda uw, lw: (-uw/2 - (lw-uw)/8, uw/2 + (lw-uw)/8, -lw/2 + (lw-uw)/8, lw/2 - (lw-uw)/8),
                 lambda uw, lw: (-lw/2, lw/2, -lw/2, lw/2),
                 lambda uw, lw: (-lw/4, lw/4, -lw/2, lw/2),
                 lambda uw, lw: (-uw/2, uw/2, -uw/2, uw/2),
-                lambda uw, lw: (-uw/2, uw/2, -uw, uw)]
+                lambda uw, lw: (-uw/2, uw/2, -uw, uw),
+                lambda uw, lw: (-uw/2 - (lw-uw)/16, uw/2 + (lw-uw)/16, -lw/2 + (lw-uw)/16, lw/2 - (lw-uw)/16)]
 
 def main():
     # Handle arguments
@@ -57,7 +59,8 @@ def main():
         lw = np.linalg.norm(src_pts[3] - src_pts[2]) 
         dw = lw - uw 
         sl = np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1])
-        dh = np.sqrt(sl - dw**2/4)
+        #dh = np.sqrt(sl - dw**2/4)
+        dh = 3*h/4
 
         # Form destination points at lower center
         offset = mode_offsets[args.mode](uw, lw)
@@ -67,7 +70,6 @@ def main():
         dest_lr = np.float32([w/2 + offset[3], h])
         dest_pts = np.stack([dest_ul, dest_ur, dest_ll, dest_lr], axis=0)
 
-        print(dest_pts)
         H = cv2.getPerspectiveTransform(src_pts, dest_pts)
 
         img_bev = cv2.warpPerspective(img, H, (w, h), flags=cv2.INTER_CUBIC)
@@ -82,7 +84,7 @@ def main():
         if args.write:
             s = name.split('.')
             pre = '.'.join(s[:-1]) # Strip file ending
-            cv2.imwrite(f"{pre}_bev_{args.mode}.png", img_bev)
+            #cv2.imwrite(f"{pre}_bev_{args.mode}.png", img_bev)
             np.savetxt(f"{pre}_bev_{args.mode}.csv", H, delimiter=',')
 
 
