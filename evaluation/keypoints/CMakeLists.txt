@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.12)
 project(Keypoint_evaluation)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -6,13 +6,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_C_COMPILER ${CMAKE_CXX_COMPILER})
-set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -std=c++17")
 set(CMAKE_CXX_FLAGS_DEBUG "-g")
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 find_package(OpenCV REQUIRED COMPONENTS core highgui imgproc features2d xfeatures2d)
 
-include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${OpenCV_INCLUDE_DIRS} ./)
 
 add_executable(main main.cpp)
 

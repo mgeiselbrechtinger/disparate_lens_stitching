@@ -30,62 +30,71 @@ mode_offsets = [lambda uw, lw: (-(lw - uw)/4, (lw - uw)/4, -(lw - uw)/4, (lw - u
                 lambda uw, lw: (-uw/2, uw/2, -uw, uw),
                 lambda uw, lw: (-uw/2 - (lw-uw)/16, uw/2 + (lw-uw)/16, -lw/2 + (lw-uw)/16, lw/2 - (lw-uw)/16)]
 
+# Modes: TODO implement
+#   mixed: distribute IPM over upper and lower points 
+#   upper: stretch upper points to fit IPM
+#   lower: squash lower points to fit IPM
+MODE = 'mixed'
+
+# Steps:
+#   number of IPMs to calculate between 90 to 10 degrees
+STEPS = 10
+
 def main():
     # Handle arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('img_names', nargs='+', help="Paths to image)")
-    parser.add_argument('-w', '--write', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('img_name', help="Path to image")
+    parser.add_argument('-o', '--output', nargs='?', help="Output directory")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument('-m', '--mode', type=int, default=0, help="Transformation mode")
+    #parser.add_argument('-w', '--write', action=argparse.BooleanOptionalAction, default=False)
+    #parser.add_argument('-m', '--mode', type=int, default=0, help="Transformation mode")
     args = parser.parse_args()
 
-    for name in args.img_names:
-        # Load files
-        img = cv2.imread(name, cv2.IMREAD_COLOR)
-        if img is None:
-            raise OSError(-1, "Could not open file.", name)
+    img = cv2.imread(args.img_name, cv2.IMREAD_COLOR)
+    if img is None:
+        raise OSError(-1, "Could not open file.", args.img_name)
 
-        h, w, _ = img.shape
-        
-        src_pts = manualCorrespondence(img)
-        # Sort points into order: [[upper_left, upper_right, lower_left, lower_right]]
-        src_pts = sorted(src_pts, key=lambda k: k[1]) # sort fist by y coordinate
-        src_pts[:2] = sorted(src_pts[:2]) # sort upper by x coordinate
-        src_pts[2:] = sorted(src_pts[2:]) # sort lower by x coordinate
-        src_pts = np.float32(src_pts) 
+    h, w, _ = img.shape
+    
+    src_pts = manualCorrespondence(img)
+    # Sort points into order: [[upper_left, upper_right, lower_left, lower_right]]
+    src_pts = sorted(src_pts, key=lambda k: k[1]) # sort fist by y coordinate
+    src_pts[:2] = sorted(src_pts[:2]) # sort upper by x coordinate
+    src_pts[2:] = sorted(src_pts[2:]) # sort lower by x coordinate
+    src_pts = np.float32(src_pts) 
 
-        # Squash lower points and expand upper horizontal points to get rectangle
-        uw = np.linalg.norm(src_pts[1] - src_pts[0]) 
-        lw = np.linalg.norm(src_pts[3] - src_pts[2]) 
-        dw = lw - uw 
-        sl = np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1])
-        #dh = np.sqrt(sl - dw**2/4)
-        dh = 3*h/4
+    # Parameters for destination rectangle
+    uw = np.linalg.norm(src_pts[1] - src_pts[0]) 
+    lw = np.linalg.norm(src_pts[3] - src_pts[2]) 
+    diff_width = lw - uw 
+    dist = np.sqrt(np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1]))
 
-        # Form destination points at lower center
-        offset = mode_offsets[args.mode](uw, lw)
-        dest_ul = np.float32([w/2 + offset[0], h - dh])
-        dest_ur = np.float32([w/2 + offset[1], h - dh])
-        dest_ll = np.float32([w/2 + offset[2], h])
-        dest_lr = np.float32([w/2 + offset[3], h])
+    # linearly increase distortion 
+    width_incs = np.linspace(0, diff_width, STEPS)
+    height_incs = np.linspace(dist, h, STEPS)
+
+    for step in range(STEPS): 
+        dw = width_incs[step]
+        dh = height_incs[step]
+        dest_ul = np.float32([w/2 - uw/2 - dw/4, h - dh])
+        dest_ur = np.float32([w/2 + uw/2 + dw/4, h - dh])
+        dest_ll = np.float32([w/2 - lw/2 + dw/4, h])
+        dest_lr = np.float32([w/2 + lw/2 - dw/4, h])
         dest_pts = np.stack([dest_ul, dest_ur, dest_ll, dest_lr], axis=0)
 
         H = cv2.getPerspectiveTransform(src_pts, dest_pts)
 
-        img_bev = cv2.warpPerspective(img, H, (w, h), flags=cv2.INTER_CUBIC)
-
         if args.verbose:
             print(H)
+            img_bev = cv2.warpPerspective(img, H, (w, h), flags=cv2.INTER_CUBIC)
             cv2.namedWindow("bird eye transform", cv2.WINDOW_NORMAL)        
             img_viz = np.concatenate([img, img_bev], axis=1)
             cv2.imshow('bird eye transform', img_viz)
             cv2.waitKey(0)
 
-        if args.write:
-            s = name.split('.')
-            pre = '.'.join(s[:-1]) # Strip file ending
-            #cv2.imwrite(f"{pre}_bev_{args.mode}.png", img_bev)
-            np.savetxt(f"{pre}_bev_{args.mode}.csv", H, delimiter=',')
+        if not args.output is None:
+            np.savetxt(f"{args.output}/bev_{MODE}_{step}.csv", H, delimiter=',')
+
 
 
 def manualCorrespondence(img):
