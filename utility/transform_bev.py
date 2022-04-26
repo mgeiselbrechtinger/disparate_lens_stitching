@@ -67,7 +67,9 @@ def main():
     uw = np.linalg.norm(src_pts[1] - src_pts[0]) 
     lw = np.linalg.norm(src_pts[3] - src_pts[2]) 
     diff_width = lw - uw 
-    dist = np.sqrt(np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1]))
+    #dist = np.sqrt(np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1]))
+    dist = np.sqrt(src_pts[0, 1]*src_pts[1, 1])
+
 
     # linearly increase distortion 
     width_incs = np.linspace(0, diff_width, STEPS)

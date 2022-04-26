@@ -59,7 +59,7 @@ def akaze_detect_and_match(ref_img, mod_img):
     return matches, ref_kp, mod_kp
 
 def sift_detect_and_match(ref_img, mod_img):
-    detector = cv2.SIFT_create()
+    detector = cv2.SIFT_create(nfeatures=2000, contrastThreshold=0.035, edgeThreshold=25)
     # Get keypoints and descriptors
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)

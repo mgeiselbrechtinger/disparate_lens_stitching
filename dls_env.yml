@@ -10,3 +10,4 @@ dependencies:
   - pytorch
   - onnxruntime
   - tf2onnx
+  - scikit-learn

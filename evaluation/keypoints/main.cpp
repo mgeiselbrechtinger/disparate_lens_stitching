@@ -32,6 +32,9 @@ int main(int argc, char** argv)
         .help("Select detector")
         .default_value(std::string("sift"));
 
+    parser.add_argument("-i", "--init")
+        .help("Initial transform of image");
+
     parser.add_argument("-v", "--verbose")
         .help("Set output level verbose")
         .default_value(false)
@@ -56,40 +59,57 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    // Load homography
+    Mat H_src = Mat::eye(Size(3, 3), CV_32F);
+    if(auto hname = parser.present("--init")){
+        if(loadHomography(*hname, H_src) != 0){
+            std::cerr << "Could not open homography file\n";
+            return -1;
+        }
+        warpPerspective(img_src, img_src, H_src, img_src.size());
+    }
+
     Mat H;
+    // Load homography
     if(loadHomography(parser.get<std::string>("homography"), H) != 0){
         std::cerr << "Could not open homography file\n";
         return -1;
     }
 
+    H *= H_src.inv();
+
     Mat img_dest;
+    // TODO dobule in size to accomodate for warp stretching
     Size dsize = Size(1*img_src.cols, 1*img_src.rows);
+    float dx = 0; //3*img_src.cols/2;
+    float dy = 0; //3*img_src.rows;
+    Mat A = (Mat_<float>(3, 3) << 1.0, 0.0, dx, 0.0, 1.0, dy, 0.0, 0.0, 1.0);
+    H = A*H;
     warpPerspective(img_src, img_dest, H, dsize);
 
     // Select descriptor
     Ptr<Feature2D> detector;
+    Ptr<Feature2D> detector1;
     const std::string &dname = parser.get<std::string>("--detector");
     if(dname == "sift"){
-        detector = SIFT::create(2800);
+        detector = SIFT::create(3000, 3, 0.035, 25, 1.6);
 
     }else if(dname == "orb"){
-        detector = ORB::create();
+        detector = ORB::create(1500);
   
     }else if(dname == "brisk"){
-        detector = BRISK::create();
+        detector = BRISK::create(20, 6, 1.1);
    
     }else if(dname == "akaze"){
-        detector = AKAZE::create();
+        detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.001, 4, 4, KAZE::DIFF_PM_G2);
    
     }else if(dname == "surf"){
-        detector = SURF::create(400);
+        detector = SURF::create();
     
     }else if(dname == "harris-laplace"){
-        detector = HarrisLaplaceFeatureDetector::create();
+        detector = HarrisLaplaceFeatureDetector::create(6, 0.01, 0.01, 5000, 4);
 
     }else if(dname == "asift"){
-        detector = AffineFeature::create(SIFT::create(250));
+        detector = AffineFeature::create(SIFT::create(100));
 
     }else{
       std::cerr << "Selected invalid detector\n";
@@ -97,9 +117,10 @@ int main(int argc, char** argv)
 
     }
     
+    detector1 = detector;
     std::vector<KeyPoint> kp_src, kp_dest;
     detector->detect(img_src, kp_src);
-    detector->detect(img_dest, kp_dest);
+    detector1->detect(img_dest, kp_dest);
 
     if(verbose){
         Mat img_src_kpts, img_dest_kpts;
@@ -107,7 +128,8 @@ int main(int argc, char** argv)
         drawKeypoints(img_dest, kp_dest, img_dest_kpts, Scalar::all(-1), DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
         Mat img_kpts;
-        //copyMakeBorder(img_src_kpts, img_src_kpts, 0, img_src.rows, 0, img_src.cols, BORDER_CONSTANT, Scalar(0));
+        //copyMakeBorder(img_src_kpts, img_src_kpts, 0, 3*img_src.rows, 0, img_src.cols, BORDER_CONSTANT, Scalar(0));
+        //copyMakeBorder(img_dest_kpts, img_dest_kpts, 0, img_dest.rows, 0, img_dest.cols, BORDER_CONSTANT, Scalar(0));
         hconcat(img_src_kpts, img_dest_kpts, img_kpts);
         namedWindow("Display Keypoints", WINDOW_NORMAL);
         imshow("Display Keypoints", img_kpts);
@@ -142,8 +164,11 @@ int main(int argc, char** argv)
     int correspondences = 0; 
     evaluateFeatureDetector(img_src, img_dest, H, &kp_src, &kp_dest, repeatability, correspondences, detector);
 
+    repeatability = std::max((double)repeatability, 0.0);
+    correspondences = std::max(0, correspondences);
+
     // TODO refine output
-    std::cout << "repeatability,correpondences,source_keypoints,destination_keypoints\n";
+    //std::cout << "repeatability,correspondences,source_keypoints,destination_keypoints\n";
     std::cout << repeatability << "," << correspondences << "," << kp_src.size() << "," << kp_dest.size() << std::endl;
     
     return 0;
