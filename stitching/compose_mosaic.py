@@ -11,7 +11,6 @@ import cv2
 import numpy as np
 from math import log
 
-OUTPUT_SIZE = [1024, 640]
 DEBUG_ROIS = False
 DEBUG_BOUNDS = False
 
@@ -44,9 +43,11 @@ def compose(base_img, imgs, hgs, base_on_top=True):
 
     # Align images on frame
     for img, H in zip(imgs, hgs):
+        img_warp = img
         # Add alpha channel for overlay region
-        alpha = 255*np.ones((img.shape[0], img.shape[1], 1), dtype=img.dtype)
-        img_warp = np.concatenate([img, alpha], axis=2)
+        if img.shape[2] == 3:
+            alpha = 255*np.ones((img.shape[0], img.shape[1], 1), dtype=img.dtype)
+            img_warp = np.concatenate([img, alpha], axis=2)
     
         # Apply homography and translation to frame
         AH = A.dot(H)
@@ -57,8 +58,11 @@ def compose(base_img, imgs, hgs, base_on_top=True):
 
     # Put base image on top
     if base_on_top:
-        frame[lower_offset[1] : lower_offset[1] + base_img.shape[0], 
-              lower_offset[0] : lower_offset[0] + base_img.shape[1]] = base_img
+        base_img_full = cv2.copyMakeBorder(base_img, lower_offset[1], upper_offset[1],
+                                                     lower_offset[0], upper_offset[0], 
+                                                     borderType=cv2.BORDER_CONSTANT, value=0)
+        mask = (base_img_full[..., 3] == 255)
+        frame[mask, :3] = base_img_full[mask, :3]
 
     if DEBUG_ROIS:
         for img, H in zip(imgs, hgs):
@@ -68,17 +72,8 @@ def compose(base_img, imgs, hgs, base_on_top=True):
             roi_warped = cv2.perspectiveTransform(roi.reshape(-1, 1, 2), AH)
             frame = cv2.polylines(frame, [roi_warped.astype(np.int32)], True, [0, 0, 255])
 
-    # Output frame
-    frame_size = np.int32(OUTPUT_SIZE)
-    base_aspect = base_img.shape[1]/base_img.shape[0]
-    if base_aspect > 1: 
-        frame_size[1] = int(frame_size[0]/base_aspect)
-
-    else:
-        frame_size[0] = int(frame_size[1]*base_aspect)
-
-    #frame = cv2.resize(frame, tuple(frame_size))
-    return frame
+    # Remove alpha layer
+    return frame[..., :3]
 
 
 if __name__=="__main__":

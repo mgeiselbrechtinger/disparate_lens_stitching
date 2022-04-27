@@ -49,16 +49,23 @@ def main():
     dsize = int(w*r), int(h*r)
     img_src = cv2.resize(img, dsize, interpolation=cv2.INTER_AREA)
     img_src = cv2.warpPerspective(img_src, H_src, dsize)
-    H_src_inv = np.linalg.inv(H_src)
+    S = np.float32([[1/r, 0, 0], [0, 1/r, 0], [0, 0, 1]])
+    H_src_inv = S.dot(np.linalg.inv(H_src))
 
     H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
-    img_dest = img
-    img_dest = (img_dest*0.75).astype(np.uint8)
-    img_dest = cv2.warpPerspective(img_dest, H_dest, (w, h))
+    img_dest = (img*0.75).astype(np.uint8)
+    # Add alpha layer before warping to prevent cavities in result
+    img_dest = np.concatenate((img_dest, 255*np.ones_like(img[:,:])), axis=2)
     img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
+    # Only necessary bc warp is defined on big image
     A = np.float32([[1, 0, (w - w*r)/2], [0, 1, (h - h*r)/2], [0, 0, 1]])
-    H_dest_inv = np.linalg.inv(H_dest)
-    H_dest_inv = H_dest_inv.dot(A)
+    img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h))
+    img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
+    #
+    H_dest_inv = np.linalg.inv(H_dest).dot(A)
+    
+    alpha_dest = img_dest[:, :, 3]
+    img_dest = img_dest[:, :, :3]
 
     img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
@@ -84,10 +91,8 @@ def main():
         inlier_threshold = 5
         pts_src = cv2.KeyPoint_convert(kp_src, matches_qidx)
         pts_dest = cv2.KeyPoint_convert(kp_dest, matches_tidx)
-        pts_src_ref = cv2.perspectiveTransform(pts_src.reshape(-1, 1, 2), H_src_inv)/r
+        pts_src_ref = cv2.perspectiveTransform(pts_src.reshape(-1, 1, 2), H_src_inv)
         pts_dest_ref = cv2.perspectiveTransform(pts_dest.reshape(-1, 1, 2), H_dest_inv)
-        print(pts_src_ref[100:105])
-        print(pts_dest_ref[100:105])
         inlier_mask = (np.linalg.norm(pts_src_ref - pts_dest_ref, axis=2) < inlier_threshold)
         print(f"Match inlier ratio: {np.count_nonzero(inlier_mask)/inlier_mask.size : 2f}")
 
@@ -128,6 +133,7 @@ def main():
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
 
+    img_dest = np.concatenate((img_dest, alpha[..., None]), axis=2)
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
     cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
