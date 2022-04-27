@@ -17,7 +17,7 @@ def main():
         out_file.write(HEADER)
         cmd_args = [CMD, "-d", algo]
         # loop over transforms
-        tf_path = sorted(Path(f"{DATA_DIR}bev/").glob('*'))
+        tf_path = sorted(Path(f"{DATA_DIR}bev/squashed/").glob('*'))
         for i, tf_file in enumerate(tf_path):
             cmd_args_ = cmd_args + [tf_file]
             vals = [0]*4

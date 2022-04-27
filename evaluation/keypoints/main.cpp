@@ -91,10 +91,11 @@ int main(int argc, char** argv)
     Ptr<Feature2D> detector1;
     const std::string &dname = parser.get<std::string>("--detector");
     if(dname == "sift"){
-        detector = SIFT::create(3000, 3, 0.035, 25, 1.6);
+        //detector = SIFT::create(3000, 3, 0.035, 25, 1.6);
+        detector = SIFT::create();
 
     }else if(dname == "orb"){
-        detector = ORB::create(1500);
+        detector = ORB::create(500);
   
     }else if(dname == "brisk"){
         detector = BRISK::create(20, 6, 1.1);
@@ -109,7 +110,7 @@ int main(int argc, char** argv)
         detector = HarrisLaplaceFeatureDetector::create(6, 0.01, 0.01, 5000, 4);
 
     }else if(dname == "asift"){
-        detector = AffineFeature::create(SIFT::create(100));
+        detector = AffineFeature::create(SIFT::create(200));
 
     }else{
       std::cerr << "Selected invalid detector\n";

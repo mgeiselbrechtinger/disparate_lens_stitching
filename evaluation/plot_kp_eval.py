@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 ALGOS=['sift', 'surf', 'orb', 'akaze', 'brisk', 'harris-laplace', 'asift']
-RES_DIR='./results/kp_quad_size/'
+RES_DIR='./results/kp_squashed/'
 HEADER="transform,repeatability,correspondences,source_keypoints,destination_keypoints\n"
 
 def main():

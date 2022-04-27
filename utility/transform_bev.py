@@ -14,27 +14,11 @@ import argparse
 import cv2
 import numpy as np
 
-# Modes: 
-#   (0) Squash and strech lower and upper points respectively (90degree, information loss)
-#   (1) Same as (0) but only half way (45degree)
-#   (2) Stretch upper points (90degree, no information loss)
-#   (3) Same as (2) but only half way (45degree)
-#   (4) Squash lower points (90degree, max information loss)
-#   (5) Same as (4) but only half way (45degree)
-#   (6) Same as (0) but only quarter way (25degree)
-mode_offsets = [lambda uw, lw: (-(lw - uw)/4, (lw - uw)/4, -(lw - uw)/4, (lw - uw)/4),
-                lambda uw, lw: (-uw/2 - (lw-uw)/8, uw/2 + (lw-uw)/8, -lw/2 + (lw-uw)/8, lw/2 - (lw-uw)/8),
-                lambda uw, lw: (-lw/2, lw/2, -lw/2, lw/2),
-                lambda uw, lw: (-lw/4, lw/4, -lw/2, lw/2),
-                lambda uw, lw: (-uw/2, uw/2, -uw/2, uw/2),
-                lambda uw, lw: (-uw/2, uw/2, -uw, uw),
-                lambda uw, lw: (-uw/2 - (lw-uw)/16, uw/2 + (lw-uw)/16, -lw/2 + (lw-uw)/16, lw/2 - (lw-uw)/16)]
-
 # Modes: TODO implement
-#   mixed: distribute IPM over upper and lower points 
-#   upper: stretch upper points to fit IPM
-#   lower: squash lower points to fit IPM
-MODE = 'mixed'
+#   mixed:      distribute IPM over upper and lower points 
+#   stretched:  upper points are stretched to fit IPM
+#   squashed:   lower points are squashed to fit IPM
+MODES = ["mixed", "stretched", "squashed"]
 
 # Steps:
 #   number of IPMs to calculate between 90 to 10 degrees
@@ -47,7 +31,7 @@ def main():
     parser.add_argument('-o', '--output', nargs='?', help="Output directory")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
     #parser.add_argument('-w', '--write', action=argparse.BooleanOptionalAction, default=False)
-    #parser.add_argument('-m', '--mode', type=int, default=0, help="Transformation mode")
+    parser.add_argument('-m', '--mode', choices=MODES, default=MODES[0], help="Transformation mode")
     args = parser.parse_args()
 
     img = cv2.imread(args.img_name, cv2.IMREAD_COLOR)
@@ -70,18 +54,24 @@ def main():
     #dist = np.sqrt(np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1]))
     dist = np.sqrt(src_pts[0, 1]*src_pts[1, 1])
 
-
     # linearly increase distortion 
     width_incs = np.linspace(0, diff_width, STEPS)
     height_incs = np.linspace(dist, h, STEPS)
 
+    # Select mode by mulitiplying with factor
+    fu, fl = 1, 1
+    if args.mode == "squashed":
+        fu, fl = 0, 2
+    if args.mode == "stretched":
+        fu, fl = 2, 0
+
     for step in range(STEPS): 
         dw = width_incs[step]
         dh = height_incs[step]
-        dest_ul = np.float32([w/2 - uw/2 - dw/4, h - dh])
-        dest_ur = np.float32([w/2 + uw/2 + dw/4, h - dh])
-        dest_ll = np.float32([w/2 - lw/2 + dw/4, h])
-        dest_lr = np.float32([w/2 + lw/2 - dw/4, h])
+        dest_ul = np.float32([w/2 - uw/2 - fu*dw/4, h - dh])
+        dest_ur = np.float32([w/2 + uw/2 + fu*dw/4, h - dh])
+        dest_ll = np.float32([w/2 - lw/2 + fl*dw/4, h])
+        dest_lr = np.float32([w/2 + lw/2 - fl*dw/4, h])
         dest_pts = np.stack([dest_ul, dest_ur, dest_ll, dest_lr], axis=0)
 
         H = cv2.getPerspectiveTransform(src_pts, dest_pts)
@@ -95,7 +85,7 @@ def main():
             cv2.waitKey(0)
 
         if not args.output is None:
-            np.savetxt(f"{args.output}/bev_{MODE}_{step}.csv", H, delimiter=',')
+            np.savetxt(f"{args.output}/bev_{args.mode}_{step}.csv", H, delimiter=',')
 
 
 
