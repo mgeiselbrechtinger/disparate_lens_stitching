@@ -58,6 +58,9 @@ def compose(base_img, imgs, hgs, base_on_top=True):
 
     # Put base image on top
     if base_on_top:
+        if base_img.shape[2] == 3:
+            alpha = 255*np.ones((base_img.shape[0], base_img.shape[1], 1), dtype=base_img.dtype)
+            base_img = np.concatenate([base_img, alpha], axis=2)
         base_img_full = cv2.copyMakeBorder(base_img, lower_offset[1], upper_offset[1],
                                                      lower_offset[0], upper_offset[0], 
                                                      borderType=cv2.BORDER_CONSTANT, value=0)

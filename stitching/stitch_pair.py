@@ -30,6 +30,7 @@ def main():
     parser.add_argument('-o', '--outfile', help="Path for stitched image")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-s', '--scale', type=float, default=1.0, choices=[1.0, 0.5, 0.25,0.125], help="Scale high resolution images")
+    parser.add_argument('-w', '--warp', nargs=2, help="Paths to src- and dest-image)")
     args = parser.parse_args()
 
     # Load files
@@ -38,10 +39,16 @@ def main():
     if img_src is None or img_dest is None:
         raise OSError(-1, "Could not open file.", args.img_names[0], args.img_names[1])
 
-    # Down scale images
     img_src_b = img_src
     img_dest_b = img_dest
 
+    if not args.warp is None:
+        H_src = np.loadtxt(args.warp[0], delimiter=',')
+        H_dest = np.loadtxt(args.warp[1], delimiter=',')
+        img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
+        img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
+
+    # Down scale images
     for i in range(int(-math.log(args.scale, 2))):
         img_src = cv2.pyrDown(img_src)
         img_dest = cv2.pyrDown(img_dest)
@@ -92,12 +99,20 @@ def main():
     H[2, 0] *= args.scale 
     H[2, 1] *= args.scale 
 
-    img_src = img_src_b
-    img_dest = img_dest_b
-
     if args.verbose:
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
+
+    img_src = img_src_b
+    img_dest = img_dest_b
+
+    if not args.warp is None:
+        H_src = np.loadtxt(args.warp[0], delimiter=',')
+        img_src = np.concatenate((img_src, 255*np.ones_like(img_src[:,:])), axis=2)
+        img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
+        H_dest = np.loadtxt(args.warp[1], delimiter=',')
+        img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[:,:])), axis=2)
+        img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
 
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 

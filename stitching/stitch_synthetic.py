@@ -21,11 +21,13 @@ func_dict = { 'sift'    : fm.sift_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match }
 
+GLOBAL_HOMOGRAPHY=False
+
 def main():
     # Handle arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('img_name', help="Paths to src-image)")
-    parser.add_argument('hg_names', nargs=2, help="Paths to src- and dest-transformation)")
+    parser.add_argument('hg_names', nargs='+', help="Paths to src- and dest-transformation)")
     parser.add_argument('-d', '--detector', choices=func_dict.keys(), required=True, help="Determine which feature detector to use")
     parser.add_argument('-r', '--ratio', default=2.0, type=float, help="Ratio between src and dest image")
     parser.add_argument('-t', '--top', action=argparse.BooleanOptionalAction, default=False)
@@ -38,32 +40,43 @@ def main():
     if img is None:
         raise OSError(-1, "Could not open file.", args.img_name)
 
-    # Transform images
-    r = 1/args.ratio
+    # Transform images with alpha layers for easy composition
     h, w, _ = img.shape
+    r = 1/args.ratio
+    dsize = int(w*r), int(h*r)
     H_src = np.loadtxt(args.hg_names[0], delimiter=',')
+    H_dest = np.copy(H_src)
+
+    # Downscale source image to mimic higher resolution of destination image
     H_src[0, 2] *= r 
     H_src[1, 2] *= r 
     H_src[2, 0] /= r 
     H_src[2, 1] /= r 
-    dsize = int(w*r), int(h*r)
     img_src = cv2.resize(img, dsize, interpolation=cv2.INTER_AREA)
+    img_src = np.concatenate((img_src, 255*np.ones_like(img_src[:,:])), axis=2)
     img_src = cv2.warpPerspective(img_src, H_src, dsize)
     S = np.float32([[1/r, 0, 0], [0, 1/r, 0], [0, 0, 1]])
     H_src_inv = S.dot(np.linalg.inv(H_src))
 
-    H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
+    # Crop destination image to mimic restricted FOV
     img_dest = (img*0.75).astype(np.uint8)
-    # Add alpha layer before warping to prevent cavities in result
-    img_dest = np.concatenate((img_dest, 255*np.ones_like(img[:,:])), axis=2)
     img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
-    # Only necessary bc warp is defined on big image
+    img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[:,:])), axis=2)
     A = np.float32([[1, 0, (w - w*r)/2], [0, 1, (h - h*r)/2], [0, 0, 1]])
-    img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h))
-    img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
-    #
-    H_dest_inv = np.linalg.inv(H_dest).dot(A)
+    if len(args.hg_names) == 1:
+        # Shift and warp with full image homography and crop again
+        img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h))
+        img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
+        H_dest_inv = np.linalg.inv(H_dest).dot(A)
+    else:
+        # Use separate homography for cropped image
+        H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
+        img_dest = cv2.warpPerspective(img_dest, H_dest, dsize)
+        H_dest_inv = A.dot(np.linalg.inv(H_dest))
     
+    # Strap alpha layers for image registration
+    alpha_src = img_src[:, :, 3]
+    img_src = img_src[:, :, :3]
     alpha_dest = img_dest[:, :, 3]
     img_dest = img_dest[:, :, :3]
 
@@ -133,7 +146,9 @@ def main():
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
 
-    img_dest = np.concatenate((img_dest, alpha[..., None]), axis=2)
+    # Re-append alpha layers for cavity free composition
+    img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
+    img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
     cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        

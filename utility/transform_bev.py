@@ -30,13 +30,19 @@ def main():
     parser.add_argument('img_name', help="Path to image")
     parser.add_argument('-o', '--output', nargs='?', help="Output directory")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
-    #parser.add_argument('-w', '--write', action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument('-m', '--mode', choices=MODES, default=MODES[0], help="Transformation mode")
+    parser.add_argument('-r', '--ratio', default=1.0, type=float, help="Ratio between src and dest image")
+
     args = parser.parse_args()
 
     img = cv2.imread(args.img_name, cv2.IMREAD_COLOR)
     if img is None:
         raise OSError(-1, "Could not open file.", args.img_name)
+
+    # Crop image ratio from middle
+    r = 1/args.ratio
+    h, w, _ = img.shape
+    img = img[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
 
     h, w, _ = img.shape
     
@@ -46,6 +52,10 @@ def main():
     src_pts[:2] = sorted(src_pts[:2]) # sort upper by x coordinate
     src_pts[2:] = sorted(src_pts[2:]) # sort lower by x coordinate
     src_pts = np.float32(src_pts) 
+
+    # Average y coordinates
+    src_pts[:2 , 1] = np.mean(src_pts[:2, 1])
+    src_pts[2: , 1] = np.mean(src_pts[2:, 1])
 
     # Parameters for destination rectangle
     uw = np.linalg.norm(src_pts[1] - src_pts[0]) 
