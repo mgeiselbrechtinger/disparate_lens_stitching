@@ -53,25 +53,25 @@ def main():
     H_src[2, 0] /= r 
     H_src[2, 1] /= r 
     img_src = cv2.resize(img, dsize, interpolation=cv2.INTER_AREA)
-    img_src = np.concatenate((img_src, 255*np.ones_like(img_src[:,:])), axis=2)
-    img_src = cv2.warpPerspective(img_src, H_src, dsize)
+    img_src = np.concatenate((img_src, 255*np.ones_like(img_src[..., :1])), axis=2)
+    img_src = cv2.warpPerspective(img_src, H_src, dsize, flags=cv2.INTER_LINEAR)
     S = np.float32([[1/r, 0, 0], [0, 1/r, 0], [0, 0, 1]])
     H_src_inv = S.dot(np.linalg.inv(H_src))
 
     # Crop destination image to mimic restricted FOV
     img_dest = (img*0.75).astype(np.uint8)
     img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
-    img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[:,:])), axis=2)
+    img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[..., :1])), axis=2)
     A = np.float32([[1, 0, (w - w*r)/2], [0, 1, (h - h*r)/2], [0, 0, 1]])
     if len(args.hg_names) == 1:
         # Shift and warp with full image homography and crop again
-        img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h))
+        img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h), flags=cv2.INTER_LINEAR)
         img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
         H_dest_inv = np.linalg.inv(H_dest).dot(A)
     else:
         # Use separate homography for cropped image
         H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
-        img_dest = cv2.warpPerspective(img_dest, H_dest, dsize)
+        img_dest = cv2.warpPerspective(img_dest, H_dest, dsize, flags=cv2.INTER_LINEAR)
         H_dest_inv = A.dot(np.linalg.inv(H_dest))
     
     # Strap alpha layers for image registration
@@ -168,6 +168,7 @@ def main():
     # Re-append alpha layers for cavity free composition
     img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
     img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
+
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
     cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
