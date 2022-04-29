@@ -61,6 +61,15 @@ def main():
     matches, kp_src, kp_dest = func_dict[args.detector](img_src_g, img_dest_g)
     mduration = time.time() - mstart
 
+    # Extract data from DMatch objects
+    matches_dist = np.zeros(len(matches))
+    matches_qidx = np.zeros(len(matches), dtype=np.int32)
+    matches_tidx = np.zeros(len(matches), dtype=np.int32)
+    for i, m in enumerate(matches):
+        matches_dist[i] = m.distance
+        matches_qidx[i] = m.queryIdx
+        matches_tidx[i] = m.trainIdx
+
     if args.verbose:
         print(f"Matched {len(matches)} from {len(kp_src)} source keypoints to {len(kp_dest)} destination keypoints in {mduration:03f}s")
 
@@ -76,18 +85,20 @@ def main():
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    ransac = cv2.USAC_PROSAC
+    ransac_threshold = 7.0
 
-    pts_src = list()
-    pts_dest = list()
-    matches = sorted(matches, key=lambda m: m.distance) # Sorting required for PROSAC 
-    for m in matches:
-        pts_src.append(kp_src[m.queryIdx].pt)
-        pts_dest.append(kp_dest[m.trainIdx].pt)
+    pts_src = cv2.KeyPoint_convert(kp_src, matches_qidx)
+    pts_dest = cv2.KeyPoint_convert(kp_dest, matches_tidx)
+    # Sort keypoints (only!) for PROSAC
+    if ransac == cv2.USAC_PROSAC:
+        sort_args = matches_dist.argsort()
+        pts_src = pts_src[sort_args]
+        pts_dest = pts_dest[sort_args]
 
     hstart = time.time()
-    H, inlier_mask = cv2.findHomography(np.array(pts_src, dtype=np.float32), 
-                                        np.array(pts_dest, dtype=np.float32), 
-                                        cv2.USAC_DEFAULT, 7.0)
+    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, ransac, ransac_threshold)
+
     hduration = time.time() - hstart
 
     if H is None:

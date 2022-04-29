@@ -88,6 +88,25 @@ def main():
     matches, kp_src, kp_dest = func_dict[args.detector](img_src_g, img_dest_g)
     mduration = time.time() - mstart
 
+    if args.verbose:
+        n_kp_dest = len(kp_dest)
+        # Check if source kpts are in destination FOV
+        pts_src = cv2.KeyPoint_convert(kp_src)
+        check_bounds = lambda x, d, r:  (((d - d*r)*r/2 <= x) & (x < (d + d*r)*r/2))
+        mask = ((check_bounds(pts_src[:, 0], w, r)) & (check_bounds(pts_src[:, 1], h, r)))
+        n_kp_src = np.count_nonzero(mask)
+        print(f"Found {n_kp_src} relevant keypoints in source image and {n_kp_dest} in destination image")
+
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[mask], None)
+        kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None)
+        kp_img = np.concatenate((kp_src_img, kp_dest_img), axis=1)
+        cv2.namedWindow("keypoints", cv2.WINDOW_NORMAL)        
+        cv2.setWindowProperty("keypoints", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.imshow("keypoints", kp_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+        
+
     # Extract data from DMatch objects
     matches_dist = np.zeros(len(matches))
     matches_qidx = np.zeros(len(matches), dtype=np.int32)
