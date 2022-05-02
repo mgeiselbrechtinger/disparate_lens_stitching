@@ -12,7 +12,7 @@ import numpy as np
 from math import log
 
 DEBUG_ROIS = False
-DEBUG_BOUNDS = False
+BOUND_OUTPUT = True
 
 def compose(base_img, imgs, hgs, base_on_top=True):
     # Calculate ROIs
@@ -28,11 +28,10 @@ def compose(base_img, imgs, hgs, base_on_top=True):
             roi = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
 
         roi_warped = cv2.perspectiveTransform(roi, H)
-        rois = np.concatenate([rois, roi_warped], axis=0)
+        rois = np.concatenate([rois, roi_warped], axis=0) 
 
-    # TODO Add bounding rois check bound computation
-    if DEBUG_BOUNDS:
-        rois = np.float32([[-1000, -1000], [6000, 6000]]).reshape(-1,1,2)
+    if BOUND_OUTPUT:
+        rois = np.clip(rois, np.array([[-1000, -1000]]), np.array([[6000, 6000]]))
 
     # Calculate ROI bound union 
     lower_bound = np.amin(rois, axis=0)[0].astype(np.int32)

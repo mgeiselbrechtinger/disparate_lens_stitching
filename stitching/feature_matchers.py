@@ -106,7 +106,7 @@ def sift_detect_and_match(ref_img, mod_img):
                                    k=2)
         
         for m, n in matches:
-            if m.distance < 0.7*n.distance:
+            if m.distance < 0.70*n.distance:
                 good_matches.append(m)
 
     else:

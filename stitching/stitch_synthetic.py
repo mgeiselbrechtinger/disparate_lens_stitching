@@ -100,9 +100,9 @@ def main():
         n_kp_src = np.count_nonzero(kp_mask)
         print(f"Found {n_kp_src} relevant keypoints in source image and {n_kp_dest} in destination image")
 
-        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], None, [0, 255, 0])
-        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask == False], 
-                                       kp_src_img, [0, 0, 255], cv2.DrawMatchesFlags_DRAW_OVER_OUTIMG)
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[np.logical_not(kp_mask)], None, [0, 0, 255])
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], 
+                                       kp_src_img, [0, 255, 0], cv2.DrawMatchesFlags_DRAW_OVER_OUTIMG)
         kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None, [0, 255, 0])
         kp_img = np.concatenate((kp_src_img, kp_dest_img), axis=1)
         cv2.namedWindow("keypoints", cv2.WINDOW_NORMAL)        
@@ -134,13 +134,13 @@ def main():
         print(f"Match inlier ratio: {np.count_nonzero(inlier_mask)/inlier_mask.size : 2f}")
 
         draw_params = dict(flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
-                           matchColor=[0, 255, 0],
-                           matchesMask=[(1 if x else 0) for x in inlier_mask])
+                           matchColor=[0, 0, 255],
+                           matchesMask=[(0 if x else 1) for x in inlier_mask])
         matches_img = cv2.drawMatches(img_src, kp_src, img_dest, kp_dest,
                                       matches, None, **draw_params)
         draw_params = dict(flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS | cv2.DrawMatchesFlags_DRAW_OVER_OUTIMG,
-                           matchColor=[0, 0, 255],
-                           matchesMask=[(0 if x else 1) for x in inlier_mask])
+                           matchColor=[0, 255, 0],
+                           matchesMask=[(1 if x else 0) for x in inlier_mask])
         cv2.drawMatches(img_src, kp_src, img_dest, kp_dest,
                         matches, matches_img, **draw_params)
 
