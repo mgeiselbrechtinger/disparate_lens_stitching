@@ -21,7 +21,6 @@ func_dict = { 'sift'    : fm.sift_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match }
 
-GLOBAL_HOMOGRAPHY=False
 
 def main():
     # Handle arguments
@@ -67,13 +66,11 @@ def main():
         # Shift and warp with full image homography and crop again
         img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h), flags=cv2.INTER_LINEAR)
         img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
-        H_dest_inv = np.linalg.inv(H_dest).dot(A)
         H_gt = np.linalg.inv(A).dot(H_dest.dot(H_src_inv))
     else:
         # Use separate homography for cropped image
         H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
         img_dest = cv2.warpPerspective(img_dest, H_dest, dsize, flags=cv2.INTER_LINEAR)
-        H_dest_inv = A.dot(np.linalg.inv(H_dest))
         H_gt = H_dest.dot(np.linalg.inv(A).dot(H_src_inv))
     
     # Rescale groundtruth homography
@@ -103,8 +100,10 @@ def main():
         n_kp_src = np.count_nonzero(kp_mask)
         print(f"Found {n_kp_src} relevant keypoints in source image and {n_kp_dest} in destination image")
 
-        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], None)
-        kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None)
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], None, [0, 255, 0])
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask == False], 
+                                       kp_src_img, [0, 0, 255], cv2.DrawMatchesFlags_DRAW_OVER_OUTIMG)
+        kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None, [0, 255, 0])
         kp_img = np.concatenate((kp_src_img, kp_dest_img), axis=1)
         cv2.namedWindow("keypoints", cv2.WINDOW_NORMAL)        
         cv2.setWindowProperty("keypoints", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
@@ -126,12 +125,12 @@ def main():
         print(f"Matched {len(matches)} from {len(kp_src)} source keypoints to {len(kp_dest)} destination keypoints in {mduration:03f}s")
         
         # Find inliers using ground truth
-        inlier_threshold = 5
+        inlier_threshold = 4
         pts_src = cv2.KeyPoint_convert(kp_src, matches_qidx)
         pts_dest = cv2.KeyPoint_convert(kp_dest, matches_tidx)
-        pts_src_ref = cv2.perspectiveTransform(pts_src.reshape(-1, 1, 2), H_src_inv)
-        pts_dest_ref = cv2.perspectiveTransform(pts_dest.reshape(-1, 1, 2), H_dest_inv)
-        inlier_mask = (np.linalg.norm(pts_src_ref - pts_dest_ref, axis=2) < inlier_threshold)
+        pts_src_ref = cv2.perspectiveTransform(pts_src.reshape(-1, 1, 2), H_gt).reshape(-1, 2)
+        dists = np.linalg.norm(pts_src_ref - pts_dest, axis=1) 
+        inlier_mask = (dists < inlier_threshold)
         print(f"Match inlier ratio: {np.count_nonzero(inlier_mask)/inlier_mask.size : 2f}")
 
         draw_params = dict(flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
@@ -154,29 +153,35 @@ def main():
     # Estimate Homography
     hstart = time.time()
 
-    ransac = cv2.USAC_PROSAC
+    ransac_params = dict(method=cv2.USAC_MAGSAC,
+                         ransacReprojThreshold=0.25,
+                         maxIters=10000,
+                         confidence=0.999999)
+
     # Sort keypoints for PROSAC
-    if ransac == cv2.USAC_PROSAC:
+    if ransac_params['method'] == cv2.USAC_PROSAC:
         sort_args = matches_dist.argsort()
         pts_src = pts_src[sort_args]
         pts_dest = pts_dest[sort_args]
 
-    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, ransac, 7.0)
+    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
     hduration = time.time() - hstart
 
     if H is None:
         raise ValueError("Homography estimation failed")
 
     if args.verbose:
+        print(f"RANSAC inlier ratio: {np.count_nonzero(inlier_mask)/inlier_mask.shape[0]}")
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
-        print(H_gt - H)
+        print("Elementwise error")
+        print(np.abs(H_gt - H))
 
     # Re-append alpha layers for cavity free composition
     img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
     img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
 
-    res = compose(img_dest, [img_src], [H_gt], base_on_top=args.top)
+    res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
     cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
     cv2.imshow("composition", res)

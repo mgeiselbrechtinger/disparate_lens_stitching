@@ -85,19 +85,21 @@ def main():
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    ransac = cv2.USAC_PROSAC
-    ransac_threshold = 7.0
+    ransac_params = dict(method=cv2.USAC_MAGSAC,
+                         ransacReprojThreshold=0.25,
+                         maxIters=10000,
+                         confidence=0.999999)
 
     pts_src = cv2.KeyPoint_convert(kp_src, matches_qidx)
     pts_dest = cv2.KeyPoint_convert(kp_dest, matches_tidx)
     # Sort keypoints (only!) for PROSAC
-    if ransac == cv2.USAC_PROSAC:
+    if ransac_params['method'] == cv2.USAC_PROSAC:
         sort_args = matches_dist.argsort()
         pts_src = pts_src[sort_args]
         pts_dest = pts_dest[sort_args]
 
     hstart = time.time()
-    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, ransac, ransac_threshold)
+    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
 
     hduration = time.time() - hstart
 
@@ -118,12 +120,12 @@ def main():
     img_dest = img_dest_b
 
     if not args.warp is None:
-        H_src = np.loadtxt(args.warp[0], delimiter=',')
-        img_src = np.concatenate((img_src, 255*np.ones_like(img_src[:,:])), axis=2)
-        img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
-        H_dest = np.loadtxt(args.warp[1], delimiter=',')
-        img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[:,:])), axis=2)
-        img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
+        alpha_src = 255*np.ones_like(img_src[..., :1])
+        alpha_src = cv2.warpPerspective(alpha_src, H_src, (img_src.shape[1], img_src.shape[0]))
+        img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
+        alpha_dest = 255*np.ones_like(img_dest[..., :1])
+        alpha_dest = cv2.warpPerspective(alpha_dest, H_dest, (img_dest.shape[1], img_dest.shape[0]))
+        img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
 
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 

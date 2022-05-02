@@ -19,9 +19,15 @@ def compose(base_img, imgs, hgs, base_on_top=True):
     base_rois = np.float32([[0, 0], [base_img.shape[1], base_img.shape[0]]])
     rois = base_rois.reshape(-1, 1, 2)
     for img, H in zip(imgs, hgs):
-        roi = np.float32([[0, 0], [img.shape[1], 0], [img.shape[1], img.shape[0]], [0, img.shape[0]]]) 
-        roi_warped = cv2.perspectiveTransform(roi.reshape(-1, 1, 2), H)
+        h, w, c = img.shape
+        if c == 4:
+            contours, _ = cv2.findContours(img[..., 3], cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+            roi = contours[0].astype(np.float)
 
+        else:
+            roi = np.float32([[0, 0], [w, 0], [w, h], [0, h]]).reshape(-1, 1, 2)
+
+        roi_warped = cv2.perspectiveTransform(roi, H)
         rois = np.concatenate([rois, roi_warped], axis=0)
 
     # TODO Add bounding rois check bound computation
