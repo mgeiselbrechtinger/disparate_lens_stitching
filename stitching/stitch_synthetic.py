@@ -68,12 +68,17 @@ def main():
         img_dest = cv2.warpPerspective(img_dest, H_dest.dot(A), (w, h), flags=cv2.INTER_LINEAR)
         img_dest = img_dest[int(h - h*r)//2 : int(h + h*r)//2, int(w - w*r)//2 : int(w + w*r)//2]
         H_dest_inv = np.linalg.inv(H_dest).dot(A)
+        H_gt = np.linalg.inv(A).dot(H_dest.dot(H_src_inv))
     else:
         # Use separate homography for cropped image
         H_dest = np.loadtxt(args.hg_names[1], delimiter=',')
         img_dest = cv2.warpPerspective(img_dest, H_dest, dsize, flags=cv2.INTER_LINEAR)
         H_dest_inv = A.dot(np.linalg.inv(H_dest))
+        H_gt = H_dest.dot(np.linalg.inv(A).dot(H_src_inv))
     
+    # Rescale groundtruth homography
+    H_gt /= H_gt[2, 2]
+
     # Strap alpha layers for image registration
     alpha_src = img_src[:, :, 3]
     img_src = img_src[:, :, :3]
@@ -92,12 +97,13 @@ def main():
         n_kp_dest = len(kp_dest)
         # Check if source kpts are in destination FOV
         pts_src = cv2.KeyPoint_convert(kp_src)
-        check_bounds = lambda x, d, r:  (((d - d*r)*r/2 <= x) & (x < (d + d*r)*r/2))
-        mask = ((check_bounds(pts_src[:, 0], w, r)) & (check_bounds(pts_src[:, 1], h, r)))
-        n_kp_src = np.count_nonzero(mask)
+        mask = cv2.warpPerspective(alpha_dest, np.linalg.inv(H_gt), dsize)
+        pts_src = pts_src.astype(int)
+        kp_mask = (mask[pts_src[:, 1], pts_src[:, 0]] == 255)
+        n_kp_src = np.count_nonzero(kp_mask)
         print(f"Found {n_kp_src} relevant keypoints in source image and {n_kp_dest} in destination image")
 
-        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[mask], None)
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], None)
         kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None)
         kp_img = np.concatenate((kp_src_img, kp_dest_img), axis=1)
         cv2.namedWindow("keypoints", cv2.WINDOW_NORMAL)        
@@ -164,12 +170,13 @@ def main():
     if args.verbose:
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
+        print(H_gt - H)
 
     # Re-append alpha layers for cavity free composition
     img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
     img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
 
-    res = compose(img_dest, [img_src], [H], base_on_top=args.top)
+    res = compose(img_dest, [img_src], [H_gt], base_on_top=args.top)
 
     cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
     cv2.imshow("composition", res)
