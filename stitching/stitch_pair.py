@@ -39,14 +39,14 @@ def main():
     if img_src is None or img_dest is None:
         raise OSError(-1, "Could not open file.", args.img_names[0], args.img_names[1])
 
-    img_src_b = img_src
-    img_dest_b = img_dest
-
     if not args.warp is None:
         H_src = np.loadtxt(args.warp[0], delimiter=',')
         H_dest = np.loadtxt(args.warp[1], delimiter=',')
         img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
         img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
+
+    img_src_b = img_src
+    img_dest_b = img_dest
 
     # Down scale images
     for i in range(int(-math.log(args.scale, 2))):
@@ -85,8 +85,8 @@ def main():
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
-    ransac_params = dict(method=cv2.USAC_MAGSAC,
-                         ransacReprojThreshold=0.25,
+    ransac_params = dict(method=cv2.USAC_PROSAC,
+                         ransacReprojThreshold=1.25,
                          maxIters=10000,
                          confidence=0.999999)
 
