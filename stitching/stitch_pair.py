@@ -42,8 +42,8 @@ def main():
     if not args.warp is None:
         H_src = np.loadtxt(args.warp[0], delimiter=',')
         H_dest = np.loadtxt(args.warp[1], delimiter=',')
-        img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
-        img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
+        #img_src = cv2.warpPerspective(img_src, H_src, (int(img_src.shape[1]), int(img_src.shape[0])))
+        #img_dest = cv2.warpPerspective(img_dest, H_dest, (int(img_dest.shape[1]), int(img_dest.shape[0])))
 
     img_src_b = img_src
     img_dest_b = img_dest
@@ -127,11 +127,12 @@ def main():
 
     if not args.warp is None:
         alpha_src = 255*np.ones_like(img_src[..., :1])
-        alpha_src = cv2.warpPerspective(alpha_src, H_src, (img_src.shape[1], img_src.shape[0]))
-        img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)
+        img_src = np.concatenate((img_src, alpha_src), axis=2)
+        #alpha_src = cv2.warpPerspective(alpha_src, H_src, (img_src.shape[1], img_src.shape[0]))
         alpha_dest = 255*np.ones_like(img_dest[..., :1])
-        alpha_dest = cv2.warpPerspective(alpha_dest, H_dest, (img_dest.shape[1], img_dest.shape[0]))
-        img_dest = np.concatenate((img_dest, alpha_dest[..., None]), axis=2)
+        img_dest = np.concatenate((img_dest, alpha_dest), axis=2)
+        img_dest = cv2.warpPerspective(img_dest, H_dest, (img_dest.shape[1], img_dest.shape[0]))
+        H = H_dest.dot(H)
 
     res = compose(img_dest, [img_src], [H], base_on_top=args.top)
 
