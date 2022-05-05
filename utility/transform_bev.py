@@ -62,11 +62,12 @@ def main():
     lw = np.linalg.norm(src_pts[3] - src_pts[2]) 
     diff_width = lw - uw 
     #dist = np.sqrt(np.linalg.norm(src_pts[2] - src_pts[0])*np.linalg.norm(src_pts[3] - src_pts[1]))
-    dist = np.sqrt(src_pts[0, 1]*src_pts[1, 1])
+    #dist_height = np.sqrt(src_pts[0, 1]*src_pts[1, 1])
+    dist_height = (src_pts[0, 1] + src_pts[1, 1])/2
 
     # linearly increase distortion 
     width_incs = np.linspace(0, diff_width, STEPS)
-    height_incs = np.linspace(dist, h, STEPS)
+    height_incs = np.linspace(0, 2*dist_height, STEPS)
 
     # Select mode by mulitiplying with factor
     fu, fl = 1, 1
@@ -78,10 +79,16 @@ def main():
     for step in range(STEPS): 
         dw = width_incs[step]
         dh = height_incs[step]
-        dest_ul = np.float32([w/2 - uw/2 - fu*dw/4, h - dh])
-        dest_ur = np.float32([w/2 + uw/2 + fu*dw/4, h - dh])
-        dest_ll = np.float32([w/2 - lw/2 + fl*dw/4, h])
-        dest_lr = np.float32([w/2 + lw/2 - fl*dw/4, h])
+        # centers lane, transforms with and stretches height
+        #dest_ul = np.float32([w/2 - uw/2 - fu*dw/4, h - dh])
+        #dest_ur = np.float32([w/2 + uw/2 + fu*dw/4, h - dh])
+        #dest_ll = np.float32([w/2 - lw/2 + fl*dw/4, h])
+        #dest_lr = np.float32([w/2 + lw/2 - fl*dw/4, h])
+        # solely transform with
+        dest_ul = np.float32([src_pts[0, 0] - fu*dw/4, src_pts[0, 1]])
+        dest_ur = np.float32([src_pts[1, 0] + fu*dw/4, src_pts[1, 1]])
+        dest_ll = np.float32([src_pts[2, 0] + fl*dw/4, src_pts[2, 1]])
+        dest_lr = np.float32([src_pts[3, 0] - fl*dw/4, src_pts[3, 1]])
         dest_pts = np.stack([dest_ul, dest_ur, dest_ll, dest_lr], axis=0)
 
         H = cv2.getPerspectiveTransform(src_pts, dest_pts)

@@ -12,7 +12,7 @@ import numpy as np
 from math import log
 
 DEBUG_ROIS = False
-BOUND_OUTPUT = True
+BOUND_OUTPUT = False
 
 def compose(base_img, imgs, hgs, base_on_top=True):
     # Calculate ROIs
