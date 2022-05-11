@@ -22,7 +22,10 @@ int main(int argc, char** argv)
     // Parse arguments
     argparse::ArgumentParser parser("Keypoint-eval");
 
-    parser.add_argument("image")
+    parser.add_argument("img_src")
+        .help("Path to image file");
+
+    parser.add_argument("img_dest")
         .help("Path to image file");
 
     parser.add_argument("homography")
@@ -51,22 +54,23 @@ int main(int argc, char** argv)
 
     bool verbose = parser.get<bool>("--verbose");
 
-    Mat img_src;
-    img_src = imread(parser.get<std::string>("image"), IMREAD_GRAYSCALE);
+    Mat img_src, img_dest;
+    img_src = imread(parser.get<std::string>("img_src"), IMREAD_GRAYSCALE);
+    img_dest = imread(parser.get<std::string>("img_dest"), IMREAD_GRAYSCALE);
 
-    if(!img_src.data){
+    if(!img_src.data || !img_dest.data){
         std::cerr << "No image data found.\n";
         return -1;
     }
 
-    Mat H_src = Mat::eye(Size(3, 3), CV_32F);
-    if(auto hname = parser.present("--init")){
-        if(loadHomography(*hname, H_src) != 0){
-            std::cerr << "Could not open homography file\n";
-            return -1;
-        }
-        warpPerspective(img_src, img_src, H_src, img_src.size());
-    }
+    //Mat H_src = Mat::eye(Size(3, 3), CV_32F);
+    //if(auto hname = parser.present("--init")){
+    //    if(loadHomography(*hname, H_src) != 0){
+    //        std::cerr << "Could not open homography file\n";
+    //        return -1;
+    //    }
+    //    warpPerspective(img_src, img_src, H_src, img_src.size());
+    //}
 
     Mat H;
     // Load homography
@@ -75,39 +79,41 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    H *= H_src.inv();
 
-    Mat img_dest;
+    //Mat img_dest;
+    //H *= H_src.inv();
     // TODO dobule in size to accomodate for warp stretching
-    Size dsize = Size(1*img_src.cols, 1*img_src.rows);
-    float dx = 0; //3*img_src.cols/2;
-    float dy = 0; //3*img_src.rows;
-    Mat A = (Mat_<float>(3, 3) << 1.0, 0.0, dx, 0.0, 1.0, dy, 0.0, 0.0, 1.0);
-    H = A*H;
-    warpPerspective(img_src, img_dest, H, dsize);
+    //Size dsize = Size(1*img_src.cols, 1*img_src.rows);
+    //float dx = 0; //3*img_src.cols/2;
+    //float dy = 0; //3*img_src.rows;
+    //Mat A = (Mat_<float>(3, 3) << 1.0, 0.0, dx, 0.0, 1.0, dy, 0.0, 0.0, 1.0);
+    //H = A*H;
+    //warpPerspective(img_src, img_dest, H, dsize);
 
     // Select descriptor
     Ptr<Feature2D> detector;
-    Ptr<Feature2D> detector1;
     const std::string &dname = parser.get<std::string>("--detector");
     if(dname == "sift"){
         //detector = SIFT::create(3000, 3, 0.035, 25, 1.6);
-        detector = SIFT::create(1000);
+        detector = SIFT::create();
 
     }else if(dname == "orb"){
-        detector = ORB::create(1000);
+        detector = ORB::create();
   
     }else if(dname == "brisk"){
-        detector = BRISK::create(20, 6, 1.1);
+        //detector = BRISK::create(20, 6, 1.1);
+        detector = BRISK::create();
    
     }else if(dname == "akaze"){
-        detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.001, 4, 4, KAZE::DIFF_PM_G2);
+        //detector = AKAZE::create(AKAZE::DESCRIPTOR_MLDB, 0, 3, 0.001, 4, 4, KAZE::DIFF_PM_G2);
+        detector = AKAZE::create();
    
     }else if(dname == "surf"){
         detector = SURF::create();
     
     }else if(dname == "harris-laplace"){
-        detector = HarrisLaplaceFeatureDetector::create(6, 0.01, 0.01, 5000, 4);
+        //detector = HarrisLaplaceFeatureDetector::create(6, 0.01, 0.01, 5000, 4);
+        detector = HarrisLaplaceFeatureDetector::create();
 
     }else if(dname == "asift"){
         detector = AffineFeature::create(SIFT::create(50));
@@ -118,10 +124,9 @@ int main(int argc, char** argv)
 
     }
     
-    detector1 = detector;
     std::vector<KeyPoint> kp_src, kp_dest;
     detector->detect(img_src, kp_src);
-    detector1->detect(img_dest, kp_dest);
+    detector->detect(img_dest, kp_dest);
 
     if(verbose){
         Mat img_src_kpts, img_dest_kpts;

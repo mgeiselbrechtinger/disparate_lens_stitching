@@ -17,13 +17,18 @@ import feature_matchers as fm
 
 func_dict = { 'sift'    : fm.sift_detect_and_match, 
               'orb'     : fm.orb_detect_and_match,
+              'surf'    : fm.surf_detect_and_match,
               'akaze'   : fm.akaze_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match }
 
 stats = { 'keypoints'   : 0,
           'matches'     : 0,
-          'ratio'       : 1 }
+          'ratio'       : 1,
+          'error'       : 0 }
+
+RANSAC_THRESHOLD = 7.0
+MATCH_THRESHOLD = 4.0
 
 def main():
     # Handle arguments
@@ -135,12 +140,11 @@ def main():
         matches_tidx[i] = m.trainIdx
 
     # Find inliers using ground truth
-    inlier_threshold = 4
     pts_src = cv2.KeyPoint_convert(kp_src, matches_qidx)
     pts_dest = cv2.KeyPoint_convert(kp_dest, matches_tidx)
     pts_src_ref = cv2.perspectiveTransform(pts_src.reshape(-1, 1, 2), H_gt).reshape(-1, 2)
     dists = np.linalg.norm(pts_src_ref - pts_dest, axis=1) 
-    inlier_mask = (dists < inlier_threshold)
+    inlier_mask = (dists < MATCH_THRESHOLD)
     stats['matches'] = np.count_nonzero(inlier_mask)
 
     if args.verbose:
@@ -171,8 +175,8 @@ def main():
     # Estimate Homography
     hstart = time.time()
 
-    ransac_params = dict(method=cv2.USAC_MAGSAC,
-                         ransacReprojThreshold=0.25,
+    ransac_params = dict(method=cv2.USAC_PROSAC,
+                         ransacReprojThreshold=RANSAC_THRESHOLD,
                          maxIters=10000,
                          confidence=0.999999)
 
@@ -181,6 +185,7 @@ def main():
         sort_args = matches_dist.argsort()
         pts_src = pts_src[sort_args]
         pts_dest = pts_dest[sort_args]
+        pts_src_ref = pts_src_ref[sort_args]
 
     H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
     hduration = time.time() - hstart
@@ -188,13 +193,15 @@ def main():
     if H is None:
         raise ValueError("Homography estimation failed")
 
+    inlier_mask = inlier_mask.ravel()
+    pts_src_est = cv2.perspectiveTransform(pts_src[inlier_mask].reshape(-1, 1, 2), H).reshape(-1, 2)
+    dists = np.linalg.norm(pts_src_ref[inlier_mask] - pts_src_est, axis=1)
+    stats['error'] = np.mean(dists)
+
     if args.verbose:
         print(f"RANSAC inlier ratio: {np.count_nonzero(inlier_mask)/inlier_mask.shape[0]}")
         print(f"Estimated homography with {args.detector.upper()} in {hduration:03f}s")
         print(H)
-        print("Elementwise error")
-        print(np.abs(H_gt - H))
-        print(np.allclose(H_gt, H, 0.2, 0.1))
 
         # Re-append alpha layers for cavity free composition
         img_src = np.concatenate((img_src, alpha_src[..., None]), axis=2)

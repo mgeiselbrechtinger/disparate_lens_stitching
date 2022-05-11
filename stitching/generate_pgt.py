@@ -43,10 +43,11 @@ def main():
     img_src_gray = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_gray = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
 
-    img_src_gray_h = cv2.pyrDown(img_src_gray)
-    img_dest_gray_h = cv2.pyrDown(img_dest_gray)
-
-    scale = 0.5
+    scale = 1.0
+    img_src_gray_h = img_src_gray
+    img_dest_gray_h = img_dest_gray
+    #img_src_gray_h = cv2.pyrDown(img_src_gray)
+    #img_dest_gray_h = cv2.pyrDown(img_dest_gray)
     H_r = H
     H_r[0, 2] *= scale 
     H_r[1, 2] *= scale 
@@ -55,7 +56,7 @@ def main():
 
     start_ecc = time.time()
 
-    term_criteria = (cv2.TERM_CRITERIA_EPS, None, 1E-6)
+    term_criteria = (cv2.TERM_CRITERIA_EPS, None, 1E-7)
     _, H_r = cv2.findTransformECC(img_src_gray_h, img_dest_gray_h, 
                                   np.array(H_r, dtype=np.float32), 
                                   cv2.MOTION_HOMOGRAPHY, term_criteria)
@@ -73,9 +74,9 @@ def main():
         print(f"Refined pseudo ground truth homography in {ecc_duration:03f}s")
         print(H_r)
 
-
         res_hl = compose(img_dest, [img_src], [H])
         res_ref = compose(img_dest, [img_src], [H_r])
+        res_hl = cv2.resize(res_hl, (res_ref.shape[1], res_ref.shape[0]), 0)
         comb = np.concatenate((res_hl, res_ref), axis=1)
         cv2.namedWindow("hand-labeled vs refined", cv2.WINDOW_NORMAL)        
         cv2.imshow("hand-labeled vs refined", comb)
