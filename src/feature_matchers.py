@@ -17,7 +17,7 @@ import numpy as np
 ONNX_PATH = "./onnx_models/"
 
 def orb_detect_and_match(ref_img, mod_img):
-    detector = cv2.ORB_create()
+    detector = cv2.ORB_create(nfeatures=4000)
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
