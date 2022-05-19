@@ -15,9 +15,10 @@ import numpy as np
 #from extract_patches.core import extract_patches
 
 ONNX_PATH = "./onnx_models/"
+nfeatures=8000
 
 def orb_detect_and_match(ref_img, mod_img):
-    detector = cv2.ORB_create(nfeatures=4000)
+    detector = cv2.ORB_create(nfeatures=nfeatures, scaleFactor=1.2, nlevels=8)
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
@@ -31,6 +32,13 @@ def brisk_detect_and_match(ref_img, mod_img):
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
 
+    idxs = np.flip(np.argsort([kp.response for kp in ref_kp]))
+    ref_kp = np.array(ref_kp)[idxs][:min(len(ref_kp), nfeatures)]
+    ref_des = np.array(ref_des)[idxs][:min(len(ref_des), nfeatures)]
+    idxs = np.flip(np.argsort([kp.response for kp in mod_kp]))
+    mod_kp = np.array(mod_kp)[idxs][:min(len(mod_kp), nfeatures)]
+    mod_des = np.array(mod_des)[idxs][:min(len(mod_des), nfeatures)]
+
     matches = match(ref_kp, ref_des, mod_kp, mod_des, des_type=cv2.NORM_HAMMING)
     return matches, ref_kp, mod_kp
 
@@ -39,6 +47,13 @@ def akaze_detect_and_match(ref_img, mod_img):
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    idxs = np.flip(np.argsort([kp.response for kp in ref_kp]))
+    ref_kp = np.array(ref_kp)[idxs][:min(len(ref_kp), nfeatures)]
+    ref_des = np.array(ref_des)[idxs][:min(len(ref_des), nfeatures)]
+    idxs = np.flip(np.argsort([kp.response for kp in mod_kp]))
+    mod_kp = np.array(mod_kp)[idxs][:min(len(mod_kp), nfeatures)]
+    mod_des = np.array(mod_des)[idxs][:min(len(mod_des), nfeatures)]
 
     matches = match(ref_kp, ref_des, mod_kp, mod_des, des_type=cv2.NORM_HAMMING)
     return matches, ref_kp, mod_kp
@@ -49,11 +64,16 @@ def surf_detect_and_match(ref_img, mod_img):
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
 
+    ref_kp = ref_kp[:min(len(ref_kp), nfeatures)]
+    ref_des = ref_des[:min(len(ref_des), nfeatures)]
+    mod_kp = mod_kp[:min(len(mod_kp), nfeatures)]
+    mod_des = mod_des[:min(len(mod_des), nfeatures)]
+
     matches = match(ref_kp, ref_des, mod_kp, mod_des)
     return matches, ref_kp, mod_kp
 
 def sift_detect_and_match(ref_img, mod_img):
-    detector = cv2.SIFT_create()
+    detector = cv2.SIFT_create(nfeatures=nfeatures)
    
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)

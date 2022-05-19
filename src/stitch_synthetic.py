@@ -15,6 +15,8 @@ import math
 from compose_mosaic import compose
 import feature_matchers as fm
 
+rng = np.random.default_rng(seed=79)
+
 func_dict = { 'sift'    : fm.sift_detect_and_match, 
               'orb'     : fm.orb_detect_and_match,
               'surf'    : fm.surf_detect_and_match,
@@ -32,8 +34,7 @@ def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, ve
               'match_threshold' : 0,
               'inliers'         : -1,
               'correct_inliers' : -1,
-              'mean_error'      : float('inf'),
-              'max_error'       : float('inf'),
+              'corner_errors'   : [float('inf')]*4,
               'iou'             : 0,
               'ratio'           : 1,
               'width'           : 0,
@@ -53,8 +54,7 @@ def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, ve
     S = np.float32([[1/r, 0, 0], [0, 1/r, 0], [0, 0, 1]])
 
     # Crop destination image to mimic restricted FOV
-    img_dest = (img*0.75).astype(np.uint8)
-    img_dest = img_dest[round(h - h*r)//2 : round(h + h*r)//2, round(w - w*r)//2 : round(w + w*r)//2]
+    img_dest = img[round(h - h*r)//2 : round(h + h*r)//2, round(w - w*r)//2 : round(w + w*r)//2]
     img_dest = np.concatenate((img_dest, 255*np.ones_like(img_dest[..., :1])), axis=2)
     A = np.float32([[1, 0, (w - w*r)/2], [0, 1, (h - h*r)/2], [0, 0, 1]])
     
@@ -68,6 +68,11 @@ def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, ve
     alpha_dest = img_dest[:, :, 3]
     img_dest = img_dest[:, :, :3]
 
+    # Add noise to destination image
+    noise = 255*rng.normal(0, 0.1, img_dest.shape)
+    brightness = rng.uniform(0.7, 1.3)
+    img_dest = np.clip(brightness*img_dest + noise, 0, 255).astype(np.uint8)
+    
     img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
 
@@ -157,7 +162,9 @@ def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, ve
         pts_dest = pts_dest[sort_args]
         pts_proj_gt = pts_proj_gt[sort_args]
 
-    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    #H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    H, inlier_mask = cv2.estimateAffine2D(pts_src, pts_dest, **ransac_params)
+    H = np.concatenate((H, np.float32([[0, 0, 1]])), axis=0)
     hduration = time.time() - hstart
 
     if H is None:
@@ -166,10 +173,13 @@ def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, ve
     inlier_mask = inlier_mask.ravel()
     stats['inliers'] = np.count_nonzero(inlier_mask)
     stats['correct_inliers'] = np.count_nonzero(np.bitwise_and(inlier_mask, match_mask))
-    pts_proj_est = cv2.perspectiveTransform(pts_src[inlier_mask].reshape(-1, 1, 2), H).reshape(-1, 2)
-    dists = np.linalg.norm(pts_proj_gt[inlier_mask] - pts_proj_est, axis=1)
-    stats['mean_error'] = np.mean(dists)/r
-    stats['max_error'] = np.amax(dists)/r
+    # Calculate reprojection error of image corners
+    # TODO transform to common scale
+    pts_grid = np.float32([[0, 0], [dsize[0], 0], dsize, [0, dsize[1]]])
+    pts_proj_gt = cv2.perspectiveTransform(pts_grid.reshape(-1, 1, 2), H_gt).reshape(-1, 2)
+    pts_proj_est = cv2.perspectiveTransform(pts_grid.reshape(-1, 1, 2), H).reshape(-1, 2)
+    dists = np.linalg.norm(pts_proj_gt - pts_proj_est, axis=1)
+    stats['corner_errors'] = dists.tolist()
     # Calculate IoU of projection
     roi = 255*np.ones_like(img_src_g)
     roi_proj_gt = cv2.warpPerspective(roi, H_gt, (w, h))
