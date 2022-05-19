@@ -1,12 +1,9 @@
-[submodule "L2-Net-Python-Keras"]
-	path = L2-Net-Python-Keras
-	url = git@github.com:virtualgraham/L2-Net-Python-Keras.git
 [submodule "hardnet"]
 	path = hardnet
 	url = git@github.com:DagnyT/hardnet.git
-[submodule "Key.Net"]
-	path = Key.Net
+[submodule "keynet"]
+	path = keynet
 	url = https://github.com/axelBarroso/Key.Net.git
-[submodule "SuperPoint"]
-	path = SuperPoint
+[submodule "superpoint"]
+	path = superpoint
 	url = https://github.com/rpautrat/SuperPoint.git
