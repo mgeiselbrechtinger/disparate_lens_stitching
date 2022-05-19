@@ -105,10 +105,8 @@ def main():
         pts_dest = pts_dest[sort_args]
 
     hstart = time.time()
-    #H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
-    H, inlier_mask = cv2.estimateAffine2D(pts_src, pts_dest, **ransac_params)
-    H = np.concatenate((H, np.float32([[0, 0, 1]])), axis=0)
-    
+    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+
     hduration = time.time() - hstart
 
     if H is None:
