@@ -4,3 +4,9 @@
 [submodule "hardnet"]
 	path = hardnet
 	url = git@github.com:DagnyT/hardnet.git
+[submodule "Key.Net"]
+	path = Key.Net
+	url = https://github.com/axelBarroso/Key.Net.git
+[submodule "SuperPoint"]
+	path = SuperPoint
+	url = https://github.com/rpautrat/SuperPoint.git
