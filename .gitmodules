@@ -7,3 +7,6 @@
 [submodule "superpoint"]
 	path = superpoint
 	url = https://github.com/rpautrat/SuperPoint.git
+[submodule "sosnet"]
+	path = sosnet
+	url = https://github.com/scape-research/SOSNet.git

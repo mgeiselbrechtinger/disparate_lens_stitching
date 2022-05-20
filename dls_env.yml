@@ -3,11 +3,14 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
-  - numpy=1.22
-  - matplotlib=3.5
   - opencv=4.5
-  - pip=20.3
+  - tensorflow-gpu=1.13
   - pytorch
-  - onnxruntime
-  - tf2onnx
-  - scikit-learn
+  - numpy
+  - scipy
+  - scikit-image
+  - matplotlib
+  - tqdm
+  - pyyaml
+  - flake8
+  - pip
