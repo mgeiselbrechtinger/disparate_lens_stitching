@@ -20,6 +20,7 @@ func_dict = { 'sift'    : fm.sift_detect_and_match,
               'surf'    : fm.surf_detect_and_match,
               'akaze'   : fm.akaze_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
+              'sosnet'  : fm.sosnet_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match }
 
 def stitcher(img, detector, ratio, match_threshold, ransac_params, top=False, verbose=False): 

@@ -4,13 +4,10 @@ channels:
 dependencies:
   - python=3.10
   - opencv=4.5
-  - tensorflow-gpu=1.13
-  - pytorch
   - numpy
-  - scipy
-  - scikit-image
   - matplotlib
-  - tqdm
-  - pyyaml
-  - flake8
+  - onnx
+  - onnxruntime
   - pip
+  - pip:
+    - extract_patches
