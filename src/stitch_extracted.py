@@ -12,34 +12,58 @@ import numpy as np
 import time
 import math
 
-from feature_matchers import match
+import feature_matchers as fm
 from compose_mosaic import compose
 
-def stitcher(img_src, img_des, kp_src, kp_dest, des_src, des_dest, H_gt,
-             des_type, match_threshold, ransac_params, top=False, verbose=False): 
+func_dict = { 'sift'    : fm.sift_detect_and_match, 
+              'orb'     : fm.orb_detect_and_match,
+              'surf'    : fm.surf_detect_and_match,
+              'akaze'   : fm.akaze_detect_and_match,
+              'brisk'   : fm.brisk_detect_and_match,
+              'sosnet'  : fm.sosnet_detect_and_match,
+              'hardnet' : fm.hardnet_detect_and_match,
+              'keynet'  : cv2.NORM_L2,
+              'r2d2'    : cv2.NORM_L2 }
+
+
+def stitcher(img_src, img_dest, H_gt, detector, feature_path, ratio,
+        match_threshold, ransac_params, top=False, verbose=False): 
     # Performance statistics
-    stats = { 'src_keypoints'   : -1,
-              'dest_keypoints'  : -1,
-              'roi_keypoints'   : -1,
-              'matches'         : -1,
-              'correct_matches' : -1,
+    stats = { 'src_keypoints'   : 0,
+              'dest_keypoints'  : 0,
+              'roi_keypoints'   : 0,
+              'matches'         : 0,
+              'correct_matches' : 0,
               'match_threshold' : 0,
-              'inliers'         : -1,
-              'correct_inliers' : -1,
-              'mean_error'      : float('inf'),
-              'max_error'       : float('inf'),
+              'inliers'         : 0,
+              'correct_inliers' : 0,
+              'grid_error'      : np.full(4, float('inf')),
               'iou'             : 0,
               'width'           : 0,
-              'height'          : 0 } 
+              'height'          : 0 }
 
-    # Matching
     mstart = time.time()
-    matches = match(kp_src, des_src, kp_dest, des_dest, des_type=des_type)
+    if detector == 'keynet' or detector == 'r2d2':
+        # Load Keypoints and Descriptors
+        src_pts =   np.load(feature_path + '/c_short_kpt.npy')
+        dest_pts =  np.load(feature_path + '/c_long_kpt.npy')
+        kp_src =    cv2.KeyPoint.convert(src_pts[:, :2])
+        kp_dest =   cv2.KeyPoint.convert(dest_pts[:, :2])
+        des_src =   np.load(feature_path + '/c_short_dsc.npy')
+        des_dest =  np.load(feature_path + '/c_long_dsc.npy')
+    
+        # Matching
+        matches = fm.match(kp_src, des_src, kp_dest, des_dest, des_type=func_dict[detector])
+
+    else:
+        img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
+        img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
+        matches, kp_src, kp_dest = func_dict[detector](img_src_g, img_dest_g)
+
     mduration = time.time() - mstart
 
     h, w, _ = img_dest.shape
 
-    ratio = np.sqrt(H_gt[0,0]*H_gt[1,1])
     dsize = int(ratio*w), int(ratio*h)
     r = 1/ratio
     
@@ -132,14 +156,15 @@ def stitcher(img_src, img_des, kp_src, kp_dest, des_src, des_dest, H_gt,
     inlier_mask = inlier_mask.ravel()
     stats['inliers'] = np.count_nonzero(inlier_mask)
     stats['correct_inliers'] = np.count_nonzero(np.bitwise_and(inlier_mask, match_mask))
-    pts_proj_est = cv2.perspectiveTransform(pts_src[inlier_mask].reshape(-1, 1, 2), H).reshape(-1, 2)
-    dists = np.linalg.norm(pts_proj_gt[inlier_mask] - pts_proj_est, axis=1)
-    stats['mean_error'] = np.mean(dists)/r
-    stats['max_error'] = np.amax(dists)/r
+    grid_pts = np.float32([[0, 0], [dsize[0], 0], dsize, [0, dsize[1]]])
+    grid_proj_est = cv2.perspectiveTransform(grid_pts.reshape(-1, 1, 2), H).reshape(-1, 2)
+    grid_proj_gt = cv2.perspectiveTransform(grid_pts.reshape(-1, 1, 2), H_gt).reshape(-1, 2)
+    dists = np.linalg.norm(grid_proj_gt - grid_proj_est, axis=1)/ratio**2
+    stats['grid_error'] = dists
     # Calculate IoU of projection
     roi = 255*np.ones_like(img_src[...,0])
-    roi_proj_gt = cv2.warpPerspective(roi, H_gt, (w, h))
-    roi_proj_est = cv2.warpPerspective(roi, H, (w, h))
+    roi_proj_gt = cv2.warpPerspective(roi, H_gt, (dsize[0]*1, dsize[1]*1))
+    roi_proj_est = cv2.warpPerspective(roi, H, (dsize[0]*1, dsize[1]*1))
     iou = np.count_nonzero(np.bitwise_and(roi_proj_gt, roi_proj_est))/np.count_nonzero(np.bitwise_or(roi_proj_gt, roi_proj_est))
     stats['iou'] = iou
 
@@ -163,28 +188,26 @@ def stitcher(img_src, img_des, kp_src, kp_dest, des_src, des_dest, H_gt,
 if __name__ == '__main__':
     # Handle arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('img_dir', help="Path to image")
-    parser.add_argument('matcher_dir', help="Path to image")
+    parser.add_argument('--img_dir', default="data/synthetic/", help="Path to image")
+    parser.add_argument('--feature_dir', default="synthetic_tracks/", help="Path to match results")
+    parser.add_argument('-d', '--detector', choices=func_dict.keys(), required=True, help="Determine which feature detector to use")
+    parser.add_argument('-s', '--sequence', default=0, type=int, choices=range(10), help="Sequence number")
+    parser.add_argument('-r', '--ratio', default=2, type=int, choices=range(2, 7), help="Ratio between src and dest image")
     parser.add_argument('-t', '--top', type=bool, default=False)
     parser.add_argument('-v', '--verbose', type=bool, default=False)
     args = parser.parse_args()
 
     # Load files
-    img_src = cv2.imread(args.img_dir + '/c_short.png', cv2.IMREAD_COLOR)
-    img_dest = cv2.imread(args.img_dir + '/c_long.png', cv2.IMREAD_COLOR)
+    data_path = f"{args.img_dir}/seq{args.sequence}/ratio{args.ratio}/"
+    img_src = cv2.imread(data_path + '/c_short.png', cv2.IMREAD_COLOR)
+    img_dest = cv2.imread(data_path + '/c_long.png', cv2.IMREAD_COLOR)
     if img_src is None or img_dest is None:
-        raise OSError(-1, "Could not open files.", args.img_name)
+        raise OSError(-1, "Could not open files.", data_path)
 
-    H_gt = np.loadtxt(args.img_dir + '/h_short2long.csv', delimiter=',')
+    H_gt = np.loadtxt(data_path + '/h_short2long.csv', delimiter=',')
     
-    # Load Keypoints and Descriptors
-    src_pts =   np.load(args.matcher_dir + '/c_short_kpt.npy')
-    dest_pts =   np.load(args.matcher_dir + '/c_long_kpt.npy')
-    src_kp =    cv2.KeyPoint.convert(src_pts[:, :2])
-    dest_kp =   cv2.KeyPoint.convert(dest_pts[:, :2])
-    src_des =   np.load(args.matcher_dir + '/c_short_dsc.npy')
-    dest_des =   np.load(args.matcher_dir + '/c_long_dsc.npy')
-    
+    feature_path = f"{args.detector}/{args.feature_dir}/seq{args.sequence}/ratio{args.ratio}/"
+
     # Setup parameters
     match_threshold = 4.0
     ransac_params = dict(method=cv2.USAC_PROSAC,
@@ -192,15 +215,11 @@ if __name__ == '__main__':
                          maxIters=10000,
                          confidence=0.999999)
 
-    dest_type = cv2.NORM_L2
-
     stats = stitcher(img_src, img_dest, 
-                     src_kp, dest_kp, 
-                     src_des, dest_des, 
-                     H_gt, dest_type, 
-                     match_threshold, 
-                     ransac_params,
-                     top=args.top, verbose=args.verbose)
+                     H_gt, args.detector, 
+                     feature_path,
+                     args.ratio, match_threshold, 
+                     ransac_params, top=args.top, verbose=args.verbose)
 
     print(stats)
 

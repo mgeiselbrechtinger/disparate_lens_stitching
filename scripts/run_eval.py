@@ -10,14 +10,16 @@ from pathlib import Path
 sys.path.append("../src/")
 sys.path.append("./src/")
 
-from stitch_synthetic import stitcher
+from stitch_extracted import stitcher
 
-ALGOS=['brisk', 'orb', 'sift', 'surf', 'akaze']
+ALGOS=['hardnet', 'sosnet'] #['brisk', 'sift', 'orb', 'akaze', 'r2d2', 'keynet'] # TODO surf
+
+AUC_THRESHOLD = 10
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('out_dir', help="Path to output directory")
-    parser.add_argument('in_dir', help="Path to input directory")
+    parser.add_argument('--out_dir', required=True, help="Path to output directory")
+    parser.add_argument('--in_dir', required=True, help="Path to input directory")
     args = parser.parse_args()
 
     match_threshold = 4.0
@@ -27,35 +29,65 @@ def main():
                          confidence=0.999999)
 
 
+    sequences = range(10)
+
     # loop over algorithms
     for algo in ALGOS:
-        ratios = np.arange(2, 5.5, 0.5)
-        rank = np.zeros_like(ratios)
-        error = np.zeros_like(ratios)
-        # loop over image sequences
-        seq_paths = Path(args.in_dir).glob('*')
-        for i, sp in enumerate(seq_paths):
-            in_file = f"{sp}/c40_0.png"
-            img = cv2.imread(in_file, 1)
-            # loop over ratios
-            for j, r in enumerate(ratios):
-                try:
-                    s = stitcher(img, algo, r, match_threshold, ransac_params)
 
-                except e:
+        ratios = range(2, 7)
+        if algo in ['keynet', 'r2d2']: 
+            ratios = range(2, 6)
+
+        ms = np.zeros((len(ratios), len(sequences)))
+        kpts = np.zeros((len(ratios), len(sequences)))
+        kp_ratios = np.zeros((len(ratios), len(sequences)))
+        grid_errs = np.zeros((len(ratios), len(sequences)))
+        inlier_ratios = np.zeros((len(ratios), len(sequences)))
+
+        for i, r in enumerate(ratios):
+
+            for s in sequences:
+                data_path = f"{args.in_dir}/seq{s}/ratio{r}/"
+                img_src = cv2.imread(data_path + '/c_short.png', cv2.IMREAD_COLOR)
+                img_dest = cv2.imread(data_path + '/c_long.png', cv2.IMREAD_COLOR)
+                if img_src is None or img_dest is None:
+                    raise OSError(-1, "Could not open files.", data_path)
+
+                H_gt = np.loadtxt(data_path + '/h_short2long.csv', delimiter=',')
+                
+                feature_dir = "synthetic_tracks"
+                feature_path = f"{algo}/{feature_dir}/seq{s}/ratio{r}/"
+
+                try:
+                    stats = stitcher(img_src, img_dest, 
+                                     H_gt, algo, feature_path,
+                                     r, match_threshold, 
+                                     ransac_params)
+
+                except Exception as e:
                     print(e)
 
                 else:
-                    if s['iou'] >= 0.6:
-                        rank[j] += 1
-                        error[j] += s['mean_error']
+                    kpts[i, s] = min(stats['dest_keypoints'], stats['src_keypoints'])
+                    kp_ratios[i, s] = stats['roi_keypoints']/min(stats['dest_keypoints'], stats['src_keypoints'])
+                    ms[i, s] = stats['correct_matches']/stats['roi_keypoints']
+                    err = stats['grid_error']
+                    inlier_ratios[i, s] = stats['correct_inliers']/(stats['matches'] - stats['correct_inliers'])
+                    
+                    err = np.ones((AUC_THRESHOLD-1, 1))*err[None, :] 
+                    mask = np.arange(1, AUC_THRESHOLD)[:, None] * np.ones((1, 4)) 
+                    grid_errs[i, s] = np.sum(np.mean(err < mask, axis=1))
 
-        rank /= (i+1)
-        error /= (i+1)
-        print(rank)
-        print(error)
+
+        data_out = dict()
+        data_out['kpts'] = np.mean(kpts, axis=1).tolist()
+        data_out['kp_ratio'] = np.mean(kp_ratios, axis=1).tolist()
+        data_out['mAA'] = (np.mean(grid_errs, axis=1)/AUC_THRESHOLD).tolist()
+        data_out['matching_score'] = np.mean(ms, axis=1).tolist()
+        data_out['inlier_ratio'] = np.mean(inlier_ratios, axis=1).tolist()
+
         with open(f"{args.out_dir}/res_{algo}.json", 'w') as of:
-            json.dump(rank.tolist(), of)
+            json.dump(data_out, of)
     
         print(f"Finished evaluation {algo}")
             

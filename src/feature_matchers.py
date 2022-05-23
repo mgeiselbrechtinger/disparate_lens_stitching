@@ -15,9 +15,9 @@ import onnxruntime
 from extract_patches.core import extract_patches
 
 ONNX_PATH = "./onnx_models/"
-
+MAX_FEATURES = 4000
 def orb_detect_and_match(ref_img, mod_img):
-    detector = cv2.ORB_create(nfeatures=4000)
+    detector = cv2.ORB_create(nfeatures=MAX_FEATURES)
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
@@ -28,8 +28,8 @@ def orb_detect_and_match(ref_img, mod_img):
 def brisk_detect_and_match(ref_img, mod_img):
     detector = cv2.BRISK_create()
     
-    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
-    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+    ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
+    mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
 
     matches = match(ref_kp, ref_des, mod_kp, mod_des, des_type=cv2.NORM_HAMMING)
     return matches, ref_kp, mod_kp
@@ -37,8 +37,8 @@ def brisk_detect_and_match(ref_img, mod_img):
 def akaze_detect_and_match(ref_img, mod_img):
     detector = cv2.AKAZE_create()
     
-    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
-    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+    ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
+    mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
 
     matches = match(ref_kp, ref_des, mod_kp, mod_des, des_type=cv2.NORM_HAMMING)
     return matches, ref_kp, mod_kp
@@ -46,14 +46,14 @@ def akaze_detect_and_match(ref_img, mod_img):
 def surf_detect_and_match(ref_img, mod_img):
     detector = cv2.xfeatures2d.SURF_create()
     
-    ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
-    mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+    ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
+    mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
 
     matches = match(ref_kp, ref_des, mod_kp, mod_des)
     return matches, ref_kp, mod_kp
 
 def sift_detect_and_match(ref_img, mod_img):
-    detector = cv2.SIFT_create()
+    detector = cv2.SIFT_create(nfeatures=MAX_FEATURES)
    
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
@@ -68,8 +68,8 @@ def sift_detect_and_match(ref_img, mod_img):
 def mix_detect_and_match(ref_img, mod_img):
     # SURF keypoints
     detector = cv2.xfeatures2d.SURF_create()
-    ref_kp = detector.detect(ref_img, None)
-    mod_kp = detector.detect(mod_img, None)
+    ref_kp = filter_keypoints(detector.detect(ref_img, None))
+    mod_kp = filter_keypoints(detector.detect(mod_img, None))
 
     # SIFT descriptors
     descriptor = cv2.SIFT_create()
@@ -87,7 +87,7 @@ def sosnet_detect_and_match(ref_img, mod_img):
 
 def onnx_detect_and_match(ref_img, mod_img, model_name):
     # Get DoG keypoints using SIFT
-    detector = cv2.SIFT_create()
+    detector = cv2.SIFT_create(nfeatures=MAX_FEATURES)
     ref_kp = detector.detect(ref_img, None)
     mod_kp = detector.detect(mod_img, None)
 
@@ -147,3 +147,14 @@ def match(ref_kp, ref_des, mod_kp, mod_des, des_type=cv2.NORM_L2, ratio=1.0):
 
     return good_matches
 
+def filter_keypoints(kp, des=None, k_best=MAX_FEATURES):
+    if len(kp) <= k_best:
+        return kp, des
+
+    idxs = np.argsort([k.response for k in kp])
+    kp = np.array(kp)[idxs][:k_best]
+
+    if not des is None:
+        des = np.array(des)[idxs][:k_best]
+
+    return kp, des

@@ -10,3 +10,6 @@
 [submodule "sosnet"]
 	path = sosnet
 	url = https://github.com/scape-research/SOSNet.git
+[submodule "r2d2"]
+	path = r2d2
+	url = https://github.com/naver/r2d2.git
