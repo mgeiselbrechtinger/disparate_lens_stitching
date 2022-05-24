@@ -12,7 +12,7 @@ sys.path.append("./src/")
 
 from stitch_extracted import stitcher
 
-ALGOS=['hardnet', 'sosnet'] #['brisk', 'sift', 'orb', 'akaze', 'r2d2', 'keynet'] # TODO surf
+ALGOS = ['brisk', 'sift', 'orb', 'akaze', 'r2d2', 'keynet', 'hardnet', 'sosnet'] + ['surf']
 
 AUC_THRESHOLD = 10
 
@@ -35,8 +35,6 @@ def main():
     for algo in ALGOS:
 
         ratios = range(2, 7)
-        if algo in ['keynet', 'r2d2']: 
-            ratios = range(2, 6)
 
         ms = np.zeros((len(ratios), len(sequences)))
         kpts = np.zeros((len(ratios), len(sequences)))
