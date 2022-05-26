@@ -2,13 +2,11 @@
 #
 #   Feature matching library
 #
-#   TODO use dictionary to get function from 
-#   TODO allow different matching algorithms
-#       BFMatcher.knnMatch(des1, des2, k=2) to implement Lowes ratio test
 #
 ################################################################################
 
 import cv2
+import math
 import numpy as np
 import onnx
 import onnxruntime
@@ -16,8 +14,10 @@ from extract_patches.core import extract_patches
 
 ONNX_PATH = "./onnx_models/"
 MAX_FEATURES = 4000
+
 def orb_detect_and_match(ref_img, mod_img):
-    detector = cv2.ORB_create(nfeatures=MAX_FEATURES)
+    nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
+    detector = cv2.ORB_create(nfeatures=MAX_FEATURES, nlevels=nOctaves, edgeThreshold=15)
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
@@ -26,7 +26,8 @@ def orb_detect_and_match(ref_img, mod_img):
     return matches, ref_kp, mod_kp
 
 def brisk_detect_and_match(ref_img, mod_img):
-    detector = cv2.BRISK_create()
+    nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
+    detector = cv2.BRISK_create(octaves=nOctaves, thresh=10)
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
@@ -35,7 +36,8 @@ def brisk_detect_and_match(ref_img, mod_img):
     return matches, ref_kp, mod_kp
 
 def akaze_detect_and_match(ref_img, mod_img):
-    detector = cv2.AKAZE_create()
+    nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
+    detector = cv2.AKAZE_create(nOctaves=nOctaves, threshold=0.0005 )
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
@@ -44,7 +46,8 @@ def akaze_detect_and_match(ref_img, mod_img):
     return matches, ref_kp, mod_kp
 
 def surf_detect_and_match(ref_img, mod_img):
-    detector = cv2.xfeatures2d.SURF_create()
+    nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
+    detector = cv2.xfeatures2d.SURF_create(nOctaves=nOctaves)
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))

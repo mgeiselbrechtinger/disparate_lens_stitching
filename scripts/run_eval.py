@@ -12,7 +12,9 @@ sys.path.append("./src/")
 
 from stitch_extracted import stitcher
 
-ALGOS = ['brisk', 'sift', 'orb', 'akaze', 'r2d2', 'keynet', 'hardnet', 'sosnet'] + ['surf']
+ALGOS = ['brisk', 'orb', 'akaze'] #, 'sift', 'hardnet', 'sosnet'] 
+#ALGOS += ['r2d2', 'keynet'] # Requires previous extraction
+#ALGOS += ['surf']           # Requires non-free opencv build
 
 AUC_THRESHOLD = 10
 
@@ -78,13 +80,14 @@ def main():
 
 
         data_out = dict()
+        #data_out['ratios'] = ratios
         data_out['kpts'] = np.mean(kpts, axis=1).tolist()
         data_out['kp_ratio'] = np.mean(kp_ratios, axis=1).tolist()
         data_out['mAA'] = (np.mean(grid_errs, axis=1)/AUC_THRESHOLD).tolist()
         data_out['matching_score'] = np.mean(ms, axis=1).tolist()
         data_out['inlier_ratio'] = np.mean(inlier_ratios, axis=1).tolist()
 
-        with open(f"{args.out_dir}/res_{algo}.json", 'w') as of:
+        with open(f"{args.out_dir}/{algo}+++.json", 'w') as of:
             json.dump(data_out, of)
     
         print(f"Finished evaluation {algo}")
