@@ -11,16 +11,15 @@ import cv2
 import numpy as np
 
 DATA_PATH="data/tracks/"
-OUTPUT_PATH="data/synthetic/"
+OUTPUT_PATH="tmp/"
 
 if __name__ == '__main__':
     rng = np.random.default_rng(seed=79)
     # Handle arguments
     parser = argparse.ArgumentParser()
-    #parser.add_argument('img_name', help="Path to source-image")
-    #parser.add_argument('out_dir', help="Path to output directory")
-    #parser.add_argument('-r', '--ratio', default=2.0, type=float, help="Ratio between src and dest image")
     parser.add_argument('-v', '--verbose', action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument('-n', '--noise', type=float, default=0.1)
+    parser.add_argument('-c', '--contrast', type=float, default=0.3)
     args = parser.parse_args()
 
 
@@ -48,8 +47,8 @@ if __name__ == '__main__':
             A = np.float32([[1, 0, (w - w*r)/2], [0, 1, (h - h*r)/2], [0, 0, 1]])
 
             # Add noise to destination image
-            noise = rng.normal(0, 0.1, img_dest.shape)
-            contrast = rng.uniform(0.70, 1.30)
+            noise = rng.normal(0, args.noise, img_dest.shape)
+            contrast = rng.uniform(1 - args.contrast, 1 + args.contrast)
             img_dest = contrast*(img_dest/255) + noise
             img_dest = np.clip(255*img_dest, 0, 255).astype(np.uint8)
 
@@ -58,7 +57,8 @@ if __name__ == '__main__':
             H_gt /= H_gt[2, 2]
 
             if args.verbose: 
-                viz = np.concatenate((img_src, img_dest), axis=1)
+                img_dest_v = cv2.resize(img_dest, (w, h), interpolation=cv2.INTER_CUBIC)
+                viz = np.concatenate((img_src, img_dest_v), axis=1)
                 cv2.namedWindow("composition", cv2.WINDOW_NORMAL)        
                 cv2.imshow("composition", viz)
                 cv2.waitKey(0)

@@ -61,6 +61,8 @@ def main():
 
     img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
     img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
+    # Blurring short range image helps detection of larger scale keypoints
+    #img_src_g = cv2.GaussianBlur(img_src_g, (15, 15), 0)
 
     # Detect and Match
     mstart = time.time()
@@ -92,7 +94,7 @@ def main():
         cv2.destroyAllWindows()
 
     ransac_params = dict(method=cv2.USAC_PROSAC,
-                         ransacReprojThreshold=1.25,
+                         ransacReprojThreshold=4.0,
                          maxIters=10000,
                          confidence=0.999999)
 
@@ -105,7 +107,9 @@ def main():
         pts_dest = pts_dest[sort_args]
 
     hstart = time.time()
-    H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    #H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    H, inlier_mask = cv2.estimateAffine2D(pts_src, pts_dest, **ransac_params)
+    H = np.concatenate((H, np.float32([[0, 0, 1]])), axis=0)
 
     hduration = time.time() - hstart
 

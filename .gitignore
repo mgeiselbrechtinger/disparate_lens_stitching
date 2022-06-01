@@ -130,5 +130,6 @@ dmypy.json
 
 # Custom ignores
 data/
+data_test/
 onnx_models/
 tests/

@@ -11,6 +11,10 @@ import cv2
 import numpy as np
 import time
 import math
+import sys
+
+sys.path.append("../src/")
+sys.path.append("./src/")
 
 import feature_matchers as fm
 from compose_mosaic import compose
@@ -27,7 +31,7 @@ func_dict = { 'sift'    : fm.sift_detect_and_match,
 
 
 def stitcher(img_src, img_dest, H_gt, detector, feature_path, ratio,
-        match_threshold, ransac_params, affine_model=False, top=False, verbose=False): 
+        match_threshold, ransac_params, top=False, verbose=False): 
     # Performance statistics
     stats = { 'src_keypoints'   : 0,
               'dest_keypoints'  : 0,
@@ -147,12 +151,9 @@ def stitcher(img_src, img_dest, H_gt, detector, feature_path, ratio,
         pts_dest = pts_dest[sort_args]
         pts_proj_gt = pts_proj_gt[sort_args]
 
-    if affine_model:
-        H, inlier_mask = cv2.estimateAffine2D(pts_src, pts_dest, **ransac_params)
-        H = np.concatenate((H, np.float32([[0, 0, 1]])), axis=0)
-        
-    else:
-        H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    #H, inlier_mask = cv2.findHomography(pts_src, pts_dest, **ransac_params)
+    H, inlier_mask = cv2.estimateAffine2D(pts_src, pts_dest, **ransac_params)
+    H = np.concatenate((H, np.float32([[0, 0, 1]])), axis=0)
 
     hduration = time.time() - hstart
 
@@ -194,40 +195,85 @@ def stitcher(img_src, img_dest, H_gt, detector, feature_path, ratio,
 if __name__ == '__main__':
     # Handle arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--img_dir', default="data/synthetic/", help="Path to image")
+    parser.add_argument('--img_dir', default="data/tracks/", help="Path to image")
     parser.add_argument('--feature_dir', default="synthetic_tracks/", help="Path to match results")
     parser.add_argument('-d', '--detector', choices=func_dict.keys(), required=True, help="Determine which feature detector to use")
     parser.add_argument('-s', '--sequence', default=0, type=int, choices=range(10), help="Sequence number")
-    parser.add_argument('-r', '--ratio', default=2, type=int, choices=range(2, 7), help="Ratio between src and dest image")
+    parser.add_argument('-r', '--ratio', default=2, type=int, choices=range(1, 7), help="Ratio between src and dest image")
     parser.add_argument('-t', '--top', type=bool, default=False)
     parser.add_argument('-v', '--verbose', type=bool, default=False)
-    parser.add_argument('-a', '--affine', type=bool, default=False)
     args = parser.parse_args()
 
     # Load files
-    data_path = f"{args.img_dir}/seq{args.sequence}/ratio{args.ratio}/"
-    img_src = cv2.imread(data_path + '/c_short.png', cv2.IMREAD_COLOR)
-    img_dest = cv2.imread(data_path + '/c_long.png', cv2.IMREAD_COLOR)
+    data_path = f"{args.img_dir}/seq{args.sequence}/"
+    img_src = cv2.imread(data_path + '/c40_0.png', cv2.IMREAD_COLOR)
+    img_dest = cv2.imread(data_path + '/c39_0.png', cv2.IMREAD_COLOR)
     if img_src is None or img_dest is None:
         raise OSError(-1, "Could not open files.", data_path)
 
-    H_gt = np.loadtxt(data_path + '/h_short2long.csv', delimiter=',')
+    H_gt = np.loadtxt(data_path + '/h40to39_0.csv', delimiter=',')
     
     feature_path = f"{args.detector}/{args.feature_dir}/seq{args.sequence}/ratio{args.ratio}/"
 
-    # Setup parameters
-    match_threshold = 4.0
-    ransac_params = dict(method=cv2.USAC_PROSAC,
-                         ransacReprojThreshold=4.0,
-                         maxIters=10000,
-                         confidence=0.999999)
+    detector = args.detector
+    ratio = args.ratio
 
-    stats = stitcher(img_src, img_dest, 
-                     H_gt, args.detector, 
-                     feature_path,
-                     args.ratio, match_threshold, 
-                     ransac_params, affine_model=args.affine, top=args.top, verbose=args.verbose)
+    if detector == 'keynet' or detector == 'r2d2':
+        # Load Keypoints and Descriptors
+        src_pts =   np.load(feature_path + '/c_short_kpt.npy')
+        dest_pts =  np.load(feature_path + '/c_long_kpt.npy')
+        kp_src =    cv2.KeyPoint.convert(src_pts[:, :2])
+        kp_dest =   cv2.KeyPoint.convert(dest_pts[:, :2])
+        des_src =   np.load(feature_path + '/c_short_dsc.npy')
+        des_dest =  np.load(feature_path + '/c_long_dsc.npy')
+    
+        # Matching
+        matches = fm.match(kp_src, des_src, kp_dest, des_dest, des_type=func_dict[detector])
 
-    print(stats)
+    else:
+        img_src_g = cv2.cvtColor(img_src, cv2.COLOR_BGR2GRAY)
+        img_dest_g = cv2.cvtColor(img_dest, cv2.COLOR_BGR2GRAY)
+        #img_src_g = cv2.GaussianBlur(img_src_g, (15, 15), 0)
+        matches, kp_src, kp_dest = func_dict[detector](img_src_g, img_dest_g)
+
+
+    h, w, _ = img_dest.shape
+
+    dsize = int(ratio*w), int(ratio*h)
+    r = 1/ratio
+    
+    # Keypoint stats
+    factor = 1
+    if detector == 'sift':
+        factor = 1/(2*1.6)
+    elif detector == 'orb':
+        factor = 1/31
+    elif detector == 'brisk':
+        factor = 1/12
+
+    sizes = [k.size for k in kp_src]
+    octaves = [k.octave & 255 for k in kp_src]
+    octaves = [o if o < 128 else -128 | o for o in octaves]
+    print(f"octaves min:{np.amin(octaves)}, max:{np.amax(octaves)}")
+    print(f"sizes mean:{np.mean(sizes)}, std:{np.std(sizes)}, min:{np.amin(sizes)}, max:{np.amax(sizes)}")
+    # Check if source kpts are in destination FOV
+    pts_src = cv2.KeyPoint.convert(kp_src).astype(int)
+    roi_mask = cv2.warpPerspective(255*np.ones_like(img_dest[...,0]), np.linalg.inv(H_gt), dsize)
+    kp_mask = (roi_mask[pts_src[:, 1], pts_src[:, 0]] == 255)
+    n_kp_src = np.count_nonzero(kp_mask)
+
+    if args.verbose:
+        print(f"Found {n_kp_src} relevant keypoints in source image and {len(kp_dest)} in destination image")
+
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[np.logical_not(kp_mask)], None, [0, 0, 255])
+        kp_src_img = cv2.drawKeypoints(img_src, np.array(kp_src)[kp_mask], 
+                                       kp_src_img, [0, 255, 0], cv2.DrawMatchesFlags_DRAW_OVER_OUTIMG)
+        kp_dest_img = cv2.drawKeypoints(img_dest, kp_dest, None, [0, 255, 0])
+        kp_img = np.concatenate((kp_src_img, kp_dest_img), axis=1)
+        cv2.namedWindow("keypoints", cv2.WINDOW_NORMAL)        
+        cv2.setWindowProperty("keypoints", cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+        cv2.imshow("keypoints", kp_img)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
 

@@ -9,10 +9,12 @@ from pathlib import Path
 
 sys.path.append("../src/")
 sys.path.append("./src/")
+feature_dir = "synthetic_tracks"
 
 from stitch_extracted import stitcher
 
-ALGOS = ['brisk', 'orb', 'akaze'] #, 'sift', 'hardnet', 'sosnet'] 
+ALGOS = ['sift']
+#ALGOS += ['brisk', 'orb', 'akaze', 'sift', 'hardnet', 'sosnet'] 
 #ALGOS += ['r2d2', 'keynet'] # Requires previous extraction
 #ALGOS += ['surf']           # Requires non-free opencv build
 
@@ -55,7 +57,6 @@ def main():
 
                 H_gt = np.loadtxt(data_path + '/h_short2long.csv', delimiter=',')
                 
-                feature_dir = "synthetic_tracks"
                 feature_path = f"{algo}/{feature_dir}/seq{s}/ratio{r}/"
 
                 try:
@@ -70,7 +71,8 @@ def main():
                 else:
                     kpts[i, s] = min(stats['dest_keypoints'], stats['src_keypoints'])
                     kp_ratios[i, s] = stats['roi_keypoints']/min(stats['dest_keypoints'], stats['src_keypoints'])
-                    ms[i, s] = stats['correct_matches']/stats['roi_keypoints']
+                    if stats['roi_keypoints'] > 0:
+                        ms[i, s] = stats['correct_matches']/stats['roi_keypoints']
                     err = stats['grid_error']
                     inlier_ratios[i, s] = stats['correct_inliers']/(stats['matches'] - stats['correct_inliers'])
                     
@@ -80,14 +82,14 @@ def main():
 
 
         data_out = dict()
-        #data_out['ratios'] = ratios
+        data_out['ratios'] = [r for r in ratios]
         data_out['kpts'] = np.mean(kpts, axis=1).tolist()
         data_out['kp_ratio'] = np.mean(kp_ratios, axis=1).tolist()
         data_out['mAA'] = (np.mean(grid_errs, axis=1)/AUC_THRESHOLD).tolist()
         data_out['matching_score'] = np.mean(ms, axis=1).tolist()
         data_out['inlier_ratio'] = np.mean(inlier_ratios, axis=1).tolist()
 
-        with open(f"{args.out_dir}/{algo}+++.json", 'w') as of:
+        with open(f"{args.out_dir}/{algo}.json", 'w') as of:
             json.dump(data_out, of)
     
         print(f"Finished evaluation {algo}")

@@ -8,16 +8,14 @@
 import cv2
 import math
 import numpy as np
-import onnx
-import onnxruntime
-from extract_patches.core import extract_patches
 
 ONNX_PATH = "./onnx_models/"
 MAX_FEATURES = 4000
 
 def orb_detect_and_match(ref_img, mod_img):
     nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
-    detector = cv2.ORB_create(nfeatures=MAX_FEATURES, nlevels=nOctaves, edgeThreshold=15)
+    #detector = cv2.ORB_create(nfeatures=MAX_FEATURES, nlevels=nOctaves, edgeThreshold=15)
+    detector = cv2.ORB_create(nfeatures=MAX_FEATURES)
     
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
@@ -27,7 +25,8 @@ def orb_detect_and_match(ref_img, mod_img):
 
 def brisk_detect_and_match(ref_img, mod_img):
     nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
-    detector = cv2.BRISK_create(octaves=nOctaves, thresh=10)
+    #detector = cv2.BRISK_create(octaves=nOctaves, thresh=10)
+    detector = cv2.BRISK_create()
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
@@ -37,7 +36,8 @@ def brisk_detect_and_match(ref_img, mod_img):
 
 def akaze_detect_and_match(ref_img, mod_img):
     nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
-    detector = cv2.AKAZE_create(nOctaves=nOctaves, threshold=0.0005 )
+    #detector = cv2.AKAZE_create(nOctaves=nOctaves, threshold=0.0005 )
+    detector = cv2.AKAZE_create()
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
@@ -47,7 +47,8 @@ def akaze_detect_and_match(ref_img, mod_img):
 
 def surf_detect_and_match(ref_img, mod_img):
     nOctaves = round(math.log(min(ref_img.shape), 2) - 2)
-    detector = cv2.xfeatures2d.SURF_create(nOctaves=nOctaves)
+    #detector = cv2.xfeatures2d.SURF_create(nOctaves=nOctaves, extended=True, upright=True)
+    detector = cv2.xfeatures2d.SURF_create()
     
     ref_kp, ref_des = filter_keypoints(*detector.detectAndCompute(ref_img, None))
     mod_kp, mod_des = filter_keypoints(*detector.detectAndCompute(mod_img, None))
@@ -57,9 +58,18 @@ def surf_detect_and_match(ref_img, mod_img):
 
 def sift_detect_and_match(ref_img, mod_img):
     detector = cv2.SIFT_create(nfeatures=MAX_FEATURES)
+    #detector = cv2.SIFT_create()
    
     ref_kp, ref_des = detector.detectAndCompute(ref_img, None)
     mod_kp, mod_des = detector.detectAndCompute(mod_img, None)
+
+    def remove_upsampled_octaves(kp, des):
+        octvs = np.array([k.octave & 255 for k in kp])
+        mask = (octvs < 128)
+        return filter_keypoints(np.array(kp)[mask], np.array(des)[mask])
+
+    #ref_kp, ref_des = filter_keypoints(ref_kp, ref_des)
+    #mod_kp, mod_des = remove_upsampled_octaves(mod_kp, mod_des)
 
     # RootSIFT version 
     #ref_des = np.sqrt(ref_des)#/np.linalg.norm(ref_des, ord=1, axis=0))
@@ -89,6 +99,10 @@ def sosnet_detect_and_match(ref_img, mod_img):
     return onnx_detect_and_match(ref_img, mod_img, "SOSNet")
 
 def onnx_detect_and_match(ref_img, mod_img, model_name):
+    import onnx
+    import onnxruntime
+    from extract_patches.core import extract_patches
+
     # Get DoG keypoints using SIFT
     detector = cv2.SIFT_create(nfeatures=MAX_FEATURES)
     ref_kp = detector.detect(ref_img, None)

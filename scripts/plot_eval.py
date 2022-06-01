@@ -9,7 +9,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 
-KP_ALGOS = ['sift', 'surf', 'orb', 'brisk', 'akaze', 'r2d2', 'keynet']
+KP_ALGOS = ['sift', 'orb', 'surf', 'brisk', 'akaze', 'r2d2', 'keynet']
 DSC_ALGOS = KP_ALGOS + ['sosnet', 'hardnet']
 
 def main():
