@@ -35,9 +35,19 @@ def main():
     plt.rc('axes', prop_cycle=color_cycler)
 
     # Plot data
-    plot_keypoints(data)
-    plot_matching_score(data)
+    #plot_keypoints(data)
+    #plot_matching_score(data)
     plot_accuracy(data)
+    #plot_accuracy_comp(data)
+
+
+def plot_accuracy_comp(data):
+    # Set dashed lines and same color for algorithms optimized version
+    cmap = plt.get_cmap('gist_rainbow') # Line colors
+    colors = 0.8*cmap(np.linspace(0, 1, len(data.keys())//2))
+    color_cycler = (cycler(linestyle=['-', '--'])*cycler(color=colors))
+    plt.rc('axes', prop_cycle=color_cycler)
+    plot_accuracy(dict(sorted(data.items(), key=lambda k: len(k[0].replace('+', '-').split('-')))))
 
             
 def plot_accuracy(data):

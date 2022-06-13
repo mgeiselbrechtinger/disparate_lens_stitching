@@ -22,6 +22,7 @@ func_dict = { 'sift'    : fm.sift_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
               'sosnet'  : fm.sosnet_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match,
+              'test'    : fm.test_detect_and_match,
               'keynet'  : cv2.NORM_L2,
               'r2d2'    : cv2.NORM_L2 }
 

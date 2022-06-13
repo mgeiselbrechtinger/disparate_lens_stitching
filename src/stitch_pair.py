@@ -17,6 +17,7 @@ import feature_matchers as fm
 
 func_dict = { 'sift'    : fm.sift_detect_and_match, 
               'orb'     : fm.orb_detect_and_match,
+              'test'    : fm.test_detect_and_match,
               'akaze'   : fm.akaze_detect_and_match,
               'brisk'   : fm.brisk_detect_and_match,
               'hardnet' : fm.hardnet_detect_and_match }

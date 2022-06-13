@@ -13,7 +13,7 @@ feature_dir = "synthetic_tracks"
 
 from stitch_extracted import stitcher
 
-ALGOS = ['sift']
+ALGOS = []
 #ALGOS += ['brisk', 'orb', 'akaze', 'sift', 'hardnet', 'sosnet'] 
 #ALGOS += ['r2d2', 'keynet'] # Requires previous extraction
 #ALGOS += ['surf']           # Requires non-free opencv build
@@ -63,7 +63,7 @@ def main():
                     stats = stitcher(img_src, img_dest, 
                                      H_gt, algo, feature_path,
                                      r, match_threshold, 
-                                     ransac_params)
+                                     ransac_params, affine_model=True)
 
                 except Exception as e:
                     print(e)
