@@ -1,5 +1,4 @@
 # Disparate Lens Stitching
-Code for Master Thesis: Disparate Lens Stitching
 
 It was examined how increasing disparicy between images affects
 the results of different feature-matchers for image stitching.
